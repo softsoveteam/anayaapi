@@ -281,7 +281,7 @@ export function OverviewSection() {
         <div className="px-5 py-4 border-b border-border">
           <h3 className="font-semibold">Live expected till 6:00 PM</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Remaining sessions × computers × tabs (sites, or every keyword when Multiple keywords is on).
+            Remaining sessions × computers × tabs (sites, or every keyword when Multiple keywords is on). Lunch 13:00–13:45 is excluded.
           </p>
         </div>
         {(teamPace?.data || []).length === 0 ? (
@@ -349,7 +349,9 @@ function AttendanceBanner({ attendance }: { attendance: Attendance }) {
   const tone =
     attendance.status === "on_timer"
       ? "border-accent/40 bg-accent/10 text-accent"
-      : attendance.status === "idle" || attendance.late
+      : attendance.status === "lunch"
+        ? "border-chart-3/40 bg-chart-3/10"
+        : attendance.status === "idle" || attendance.late
         ? "border-warning/40 bg-warning/10 text-warning"
         : attendance.status === "on_leave" || attendance.status === "holiday"
           ? "border-chart-3/40 bg-chart-3/10"

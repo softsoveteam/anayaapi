@@ -209,7 +209,7 @@ export function CalendarSection() {
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          Office 9:00–18:00 · Mon–Sat · 1 paid leave each month
+          Office 9:00–18:00 · Lunch 13:00–13:45 · Mon–Sat · 1 paid leave each month
         </p>
         {staff ? (
           <Button

@@ -1,16 +1,25 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api, authApi, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { isStaff } from "@/lib/types";
+import type { User } from "@/lib/types";
+import { sortEmployees } from "@/lib/employee-order";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Logo } from "@/components/brand/logo";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function SettingsSection() {
   const { user, refresh, role } = useAuth();
@@ -26,6 +35,10 @@ export function SettingsSection() {
   const [savingMinutes, setSavingMinutes] = useState(false);
   const [savingKeywords, setSavingKeywords] = useState(false);
   const [savingEarnings, setSavingEarnings] = useState(false);
+  const [employees, setEmployees] = useState<User[]>([]);
+  const [wipeEmployeeId, setWipeEmployeeId] = useState("");
+  const [wipePassword, setWipePassword] = useState("");
+  const [wiping, setWiping] = useState(false);
 
   useEffect(() => {
     if (!staff) return;
@@ -35,6 +48,9 @@ export function SettingsSection() {
         setMultipleKeywords(Boolean(res.multiple_keywords));
         setEmployeeEarnings(Boolean(res.employee_earnings));
       })
+      .catch(() => undefined);
+    api<{ data: User[] }>("/employees")
+      .then((res) => setEmployees(sortEmployees(res.data ?? [])))
       .catch(() => undefined);
   }, [staff]);
 
@@ -128,6 +144,38 @@ export function SettingsSection() {
     }
   }
 
+  const wipeCandidates = useMemo(
+    () => employees.filter((e) => e.role !== "admin" && e.id !== user?.id),
+    [employees, user?.id]
+  );
+
+  async function onWipe(e: FormEvent) {
+    e.preventDefault();
+    if (!wipeEmployeeId) {
+      toast.error("Pick an employee first");
+      return;
+    }
+    setWiping(true);
+    try {
+      const res = await api<{
+        message: string;
+        cleared: { reports: number; sessions: number; assignments: number; leaves: number; payroll: number };
+      }>(`/employees/${wipeEmployeeId}/wipe`, {
+        method: "POST",
+        body: JSON.stringify({ password: wipePassword }),
+      });
+      const c = res.cleared;
+      toast.success(
+        `${res.message} Cleared ${c.assignments} tasks, ${c.sessions} sessions, ${c.reports} click logs.`
+      );
+      setWipePassword("");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setWiping(false);
+    }
+  }
+
   if (!user) return null;
 
   return (
@@ -205,6 +253,46 @@ export function SettingsSection() {
             />
           </div>
         </div>
+      ) : null}
+
+      {staff ? (
+        <form onSubmit={onWipe} className="bg-card border border-destructive/40 rounded-xl p-5 space-y-3">
+          <h3 className="font-semibold text-destructive">Wipe employee test data</h3>
+          <p className="text-sm text-muted-foreground">
+            Clears that person’s work tasks, Work Start sessions, clicks, leave, and payslip snapshots.
+            The employee account, salary, and computers stay. Enter the wipe password to confirm.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={wipeEmployeeId} onValueChange={setWipeEmployeeId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {wipeCandidates.map((e) => (
+                    <SelectItem key={e.id} value={String(e.id)}>
+                      {e.unique_id} · {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Wipe password</Label>
+              <Input
+                type="password"
+                value={wipePassword}
+                onChange={(e) => setWipePassword(e.target.value)}
+                placeholder="Wipe password"
+                required
+              />
+            </div>
+          </div>
+          <Button type="submit" variant="destructive" disabled={wiping || !wipeEmployeeId}>
+            {wiping ? "Wiping..." : "Wipe data"}
+          </Button>
+        </form>
       ) : null}
 
       <div className="grid md:grid-cols-2 gap-6">

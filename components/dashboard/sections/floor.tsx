@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const COLUMNS: { key: keyof FloorPayload["counts"] | "working"; status: string[]; title: string }[] = [
   { key: "on_timer", status: ["on_timer"], title: "On timer" },
   { key: "idle", status: ["idle"], title: "Idle" },
+  { key: "lunch", status: ["lunch"], title: "Lunch" },
   { key: "not_started", status: ["not_started"], title: "Not started" },
   { key: "late", status: ["late"], title: "Late" },
   { key: "on_leave", status: ["on_leave", "holiday", "sunday"], title: "On leave" },
@@ -54,6 +55,7 @@ export function FloorSection() {
     return {
       on_timer: rows.filter((r) => r.status === "on_timer"),
       idle: rows.filter((r) => r.status === "idle"),
+      lunch: rows.filter((r) => r.status === "lunch"),
       not_started: rows.filter((r) => r.status === "not_started"),
       late: rows.filter((r) => r.status === "late"),
       on_leave: rows.filter((r) => r.status === "on_leave" || r.status === "holiday" || r.status === "sunday"),
@@ -69,22 +71,23 @@ export function FloorSection() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Live from Work Start. Late after 09:15. Idle after 20 minutes with no running session. Refreshes every 15s.
+          Live from Work Start. Late after 09:15. Idle after 20 minutes with no running session. Lunch 13:00–13:45 is not idle. Refreshes every 15s.
         </p>
         <p className="text-xs text-muted-foreground">
           Updated {new Date(payload.now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <CountCard label="On timer" value={counts.on_timer} tone="accent" />
         <CountCard label="Idle" value={counts.idle} tone="warning" />
+        <CountCard label="Lunch" value={counts.lunch ?? 0} />
         <CountCard label="Not started" value={counts.not_started} />
         <CountCard label="Late" value={counts.late} tone="warning" />
         <CountCard label="On leave" value={counts.on_leave} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
         {COLUMNS.map((col) => (
           <FloorColumn key={col.key} title={col.title} rows={grouped[col.key === "working" ? "working" : col.key] ?? []} />
         ))}

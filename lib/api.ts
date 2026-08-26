@@ -62,7 +62,11 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${API_URL}${path}`, {
+    cache: "no-store",
+    ...options,
+    headers,
+  });
   const data = await res.json().catch(() => ({}));
 
   if (res.status === 401 && !path.includes("/auth/login")) {

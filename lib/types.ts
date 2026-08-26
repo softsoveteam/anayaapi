@@ -34,6 +34,7 @@ export type User = {
     assigned_at: string | null;
   }[];
   created_at?: string;
+  updated_at?: string;
 };
 
 export type Computer = {
@@ -220,6 +221,7 @@ export type FloorPayload = {
   counts: {
     on_timer: number;
     idle: number;
+    lunch?: number;
     not_started: number;
     late: number;
     on_leave: number;
@@ -233,6 +235,8 @@ export type CalendarPayload = {
   month: string;
   work_start: string;
   work_end: string;
+  lunch_start?: string;
+  lunch_end?: string;
   paid_leave_quota: number;
   holidays: Holiday[];
   leaves: LeaveRequest[];
