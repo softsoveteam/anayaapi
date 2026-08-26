@@ -6,6 +6,10 @@ import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
+function lockDismiss(event: { preventDefault: () => void }) {
+  event.preventDefault()
+}
+
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -50,13 +54,15 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  overlayClassName,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  overlayClassName?: string
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
@@ -64,6 +70,10 @@ function DialogContent({
           className,
         )}
         {...props}
+        onPointerDownOutside={lockDismiss}
+        onInteractOutside={lockDismiss}
+        onFocusOutside={lockDismiss}
+        onEscapeKeyDown={(event) => event.preventDefault()}
       >
         {children}
         {showCloseButton && (

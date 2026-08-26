@@ -7,6 +7,7 @@ import { api, ApiError, errorMessage } from "@/lib/api";
 import type { Computer, User } from "@/lib/types";
 import { isStaff } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
+import { useConfirm } from "@/components/dashboard/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,7 @@ import {
 export function ComputersSection() {
   const { role } = useAuth();
   const staff = isStaff(role);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [computers, setComputers] = useState<Computer[]>([]);
   const [employees, setEmployees] = useState<User[]>([]);
   const [open, setOpen] = useState(false);
@@ -102,7 +104,13 @@ export function ComputersSection() {
       if (e instanceof ApiError && e.status === 422) {
         const data = e.data as { over_limit?: boolean };
         if (data.over_limit) {
-          if (confirm("This employee already has 3 computers. Assign another anyway?")) {
+          const ok = await confirm({
+            title: "This employee already has 3 computers",
+            description: "Assign another computer anyway?",
+            confirmLabel: "Assign anyway",
+            destructive: false,
+          });
+          if (ok) {
             await assign(true);
             return;
           }
@@ -113,6 +121,14 @@ export function ComputersSection() {
   }
 
   async function unassign(computer: Computer) {
+    const ok = await confirm({
+      title: "Unassign this computer?",
+      description: computer.assigned_to
+        ? `${computer.unique_number} will be removed from ${computer.assigned_to.name}.`
+        : computer.unique_number,
+      confirmLabel: "Unassign",
+    });
+    if (!ok) return;
     try {
       await api(`/computers/${computer.id}/unassign`, { method: "POST" });
       toast.success("Unassigned");
@@ -223,6 +239,7 @@ export function ComputersSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

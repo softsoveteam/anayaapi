@@ -7,6 +7,7 @@ import { api, errorMessage } from "@/lib/api";
 import type { Assignment, Keyword, Site, User } from "@/lib/types";
 import { directoryEmployees } from "@/lib/employee-order";
 import { SiteMark, siteDomain, siteHref } from "@/components/dashboard/site-mark";
+import { useConfirm } from "@/components/dashboard/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,7 @@ function today() {
 }
 
 export function SitesSection() {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [sites, setSites] = useState<Site[]>([]);
   const [siteOpen, setSiteOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<Site | null>(null);
@@ -115,9 +117,14 @@ export function SitesSection() {
     }
   }
 
-  async function removeKeyword(id: number) {
+  async function removeKeyword(keyword: Keyword) {
+    const ok = await confirm({
+      title: "Delete this keyword?",
+      description: `"${keyword.keyword}" will be removed from this site.`,
+    });
+    if (!ok) return;
     try {
-      await api(`/keywords/${id}`, { method: "DELETE" });
+      await api(`/keywords/${keyword.id}`, { method: "DELETE" });
       toast.success("Keyword removed");
       await loadSites();
     } catch (e) {
@@ -191,9 +198,14 @@ export function SitesSection() {
     }
   }
 
-  async function removeAssignment(id: number) {
+  async function removeAssignment(assignment: Assignment) {
+    const ok = await confirm({
+      title: "Delete this assignment?",
+      description: `${assignment.employee.name} · ${assignment.site.name} · ${assignment.keyword}`,
+    });
+    if (!ok) return;
     try {
-      await api(`/assignments/${id}`, { method: "DELETE" });
+      await api(`/assignments/${assignment.id}`, { method: "DELETE" });
       await loadAssignments();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -297,7 +309,7 @@ export function SitesSection() {
                       <Button variant="ghost" size="icon-sm" onClick={() => openEdit(a)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon-sm" onClick={() => removeAssignment(a.id)}>
+                      <Button variant="ghost" size="icon-sm" onClick={() => removeAssignment(a)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
@@ -452,7 +464,7 @@ export function SitesSection() {
                           <button
                             type="button"
                             className="text-muted-foreground hover:text-destructive"
-                            onClick={() => removeKeyword(k.id)}
+                            onClick={() => removeKeyword(k)}
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -619,6 +631,7 @@ export function SitesSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </Tabs>
   );
 }

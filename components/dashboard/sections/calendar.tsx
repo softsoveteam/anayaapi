@@ -8,6 +8,7 @@ import { currentMonth, shiftMonth } from "@/lib/money";
 import type { CalendarPayload, Holiday, LeaveRequest } from "@/lib/types";
 import { isStaff } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
+import { useConfirm } from "@/components/dashboard/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +58,7 @@ function leaveLine(leave: LeaveRequest, withName = false) {
 export function CalendarSection() {
   const { role, user } = useAuth();
   const staff = isStaff(role);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [month, setMonth] = useState(currentMonth());
   const [payload, setPayload] = useState<CalendarPayload | null>(null);
   const [selectStart, setSelectStart] = useState<string | null>(null);
@@ -149,6 +151,12 @@ export function CalendarSection() {
   }
 
   async function cancelLeave(leave: LeaveRequest) {
+    const ok = await confirm({
+      title: "Cancel this leave request?",
+      description: `${leave.start_date} → ${leave.end_date}`,
+      confirmLabel: "Cancel leave",
+    });
+    if (!ok) return;
     try {
       await api(`/my/leaves/${leave.id}`, { method: "DELETE" });
       toast.success("Leave cancelled");
@@ -183,6 +191,11 @@ export function CalendarSection() {
   }
 
   async function deleteHoliday(holiday: Holiday) {
+    const ok = await confirm({
+      title: "Delete this holiday?",
+      description: `${holiday.name} · ${holiday.date}`,
+    });
+    if (!ok) return;
     try {
       await api(`/holidays/${holiday.id}`, { method: "DELETE" });
       toast.success("Holiday removed");
@@ -429,6 +442,7 @@ export function CalendarSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {confirmDialog}
     </div>
   );
 }

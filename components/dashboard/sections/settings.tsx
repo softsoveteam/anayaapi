@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Logo } from "@/components/brand/logo";
+import { useConfirm } from "@/components/dashboard/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ import {
 export function SettingsSection() {
   const { user, refresh, role } = useAuth();
   const staff = isStaff(role);
+  const { confirm: askConfirm, dialog: confirmDialog } = useConfirm();
   const [name, setName] = useState(user?.name ?? "");
   const [profilePassword, setProfilePassword] = useState("");
   const [current, setCurrent] = useState("");
@@ -155,6 +157,15 @@ export function SettingsSection() {
       toast.error("Pick an employee first");
       return;
     }
+    const person = wipeCandidates.find((emp) => String(emp.id) === wipeEmployeeId);
+    const ok = await askConfirm({
+      title: "Wipe this employee’s test data?",
+      description: person
+        ? `${person.name} (${person.unique_id}). Tasks, sessions, clicks, leave, and payslips will be deleted. The employee account stays.`
+        : "Tasks, sessions, clicks, leave, and payslips will be deleted. The employee account stays.",
+      confirmLabel: "Wipe data",
+    });
+    if (!ok) return;
     setWiping(true);
     try {
       const res = await api<{
@@ -353,6 +364,7 @@ export function SettingsSection() {
           <Button type="submit">Update password</Button>
         </form>
       </div>
+      {confirmDialog}
     </div>
   );
 }
