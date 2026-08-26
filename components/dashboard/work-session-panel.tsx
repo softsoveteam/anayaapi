@@ -132,7 +132,10 @@ export function WorkSessionHero({
 }) {
   const running = Boolean(payload?.current);
   const minutes = payload?.session_minutes ?? 5;
-  const siteCount = payload?.current?.site_count ?? 0;
+  const siteCount = payload?.current?.site_count ?? payload?.pace?.tabs ?? payload?.pace?.sites ?? 0;
+  const computers = payload?.current?.computer_count ?? payload?.pace?.computers ?? 0;
+  const perSession = payload?.pace?.clicks_per_session ?? computers * siteCount;
+  const multipleKeywords = Boolean(payload?.pace?.multiple_keywords);
   const progress = useMemo(() => {
     const total = payload?.current?.duration_seconds ?? minutes * 60;
     if (!total) return 0;
@@ -164,7 +167,7 @@ export function WorkSessionHero({
                   {formatCountdown(remaining)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-2">
-                  {siteCount} site{siteCount === 1 ? "" : "s"} · 1 click each
+                  {computers} computer{computers === 1 ? "" : "s"} × {siteCount} tab{siteCount === 1 ? "" : "s"} = {perSession} click{perSession === 1 ? "" : "s"}
                 </div>
               </div>
             </div>
@@ -172,7 +175,9 @@ export function WorkSessionHero({
               <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${progress}%` }} />
             </div>
             <p className="text-sm text-muted-foreground max-w-sm">
-              Keep each assigned site open. When the timer ends, 1 click is added to every site automatically.
+              {multipleKeywords
+                ? "Keep every keyword open in its own tab on every computer. When the timer ends, each keyword gets one click per computer."
+                : "Keep one tab open per site on every computer. When the timer ends, each site gets one click per computer."}
             </p>
           </>
         ) : (
@@ -199,7 +204,7 @@ export function WorkSessionHero({
               </span>
             </button>
             <p className="text-sm text-muted-foreground mt-6 max-w-md">
-              Press once, open each assigned site, and wait. Clicks cannot be typed in — they are counted when this timer finishes.
+              Press once, open the assigned tabs on every computer, and wait. Clicks are counted when this timer finishes — {perSession || "computers × tabs"} per session.
             </p>
           </>
         )}
@@ -222,7 +227,7 @@ export function SessionLogs({ logs }: { logs: WorkSession[] }) {
       <div className="px-5 py-4 border-b border-border">
         <h3 className="text-base font-semibold">Session logs</h3>
         <p className="text-xs text-muted-foreground mt-1">
-          When you pressed start, when the timer finished, and clicks added per site.
+          When you pressed start, when the timer finished, and clicks added (computers × tabs).
         </p>
       </div>
       <div className="overflow-x-auto">

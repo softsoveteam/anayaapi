@@ -101,7 +101,6 @@ function EmployeeReport() {
         <h3 className="font-semibold">Today's sites and keywords</h3>
         {payload.data.map((row) => {
           const done = row.click_count ?? 0;
-          const remaining = row.remaining ?? (row.target_clicks != null ? Math.max(0, row.target_clicks - done) : null);
           return (
             <div key={row.assignment_id} className="rounded-xl border border-border p-4 space-y-2">
               <div className="grid sm:grid-cols-2 gap-3">
@@ -115,16 +114,9 @@ function EmployeeReport() {
                 </div>
               </div>
               <div className="flex justify-between text-sm">
-                <span>Done / target</span>
-                <span className="tabular-nums font-medium">
-                  {done} / {row.target_clicks ?? "no target"}
-                </span>
+                <span>Clicks today</span>
+                <span className="tabular-nums font-medium">{done}</span>
               </div>
-              {remaining != null && remaining > 0 ? (
-                <div className="text-xs text-warning font-medium">Need {remaining} more sessions</div>
-              ) : row.target_clicks != null ? (
-                <div className="text-xs text-accent font-medium">Target met</div>
-              ) : null}
             </div>
           );
         })}

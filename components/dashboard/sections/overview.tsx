@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SessionLogs, WorkSessionHero, useWorkSession } from "@/components/dashboard/work-session-panel";
-import { MousePointerClick, Users, ClipboardList, Monitor } from "lucide-react";
+import { MousePointerClick, Users, ClipboardList, Monitor, Timer } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { isStaff } from "@/lib/types";
+import type { Pace, TeamPace } from "@/lib/pace";
+import { liveExpectedRemaining, liveTeamRemaining } from "@/lib/pace";
 import {
   AreaChart,
   Area,
@@ -29,7 +31,8 @@ type Dashboard = {
     computers_available?: number;
     assignments?: number;
     submitted?: number;
-    sessions_needed?: number;
+    expected_remaining?: number;
+    expected_today?: number;
   };
   pending_eod?: { id: number; unique_id: string; name: string }[];
   unscheduled?: { id: number; unique_id: string; name: string }[];
@@ -40,11 +43,10 @@ type Dashboard = {
     site_name: string;
     site_url?: string | null;
     keyword: string;
-    target_clicks: number | null;
     click_count: number | null;
-    remaining?: number | null;
   }[];
   attendance?: Attendance;
+  expected?: Pace | TeamPace;
 };
 
 type Attendance = {
@@ -61,10 +63,24 @@ function changeType(n: number | null | undefined): "positive" | "negative" | "ne
   return n > 0 ? "positive" : "negative";
 }
 
+function useNow(ms = 1000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), ms);
+    return () => window.clearInterval(id);
+  }, [ms]);
+  return now;
+}
+
+function isTeamPace(value: Pace | TeamPace | undefined): value is TeamPace {
+  return Boolean(value && "data" in value && Array.isArray(value.data));
+}
+
 export function OverviewSection() {
   const { role } = useAuth();
   const staff = isStaff(role);
   const [data, setData] = useState<Dashboard | null>(null);
+  const now = useNow(1000);
 
   const loadDashboard = useCallback(() => {
     api<Dashboard>("/dashboard").then(setData).catch(() => setData(null));
@@ -72,6 +88,8 @@ export function OverviewSection() {
 
   useEffect(() => {
     loadDashboard();
+    const id = window.setInterval(loadDashboard, 15000);
+    return () => window.clearInterval(id);
   }, [loadDashboard]);
 
   const session = useWorkSession(loadDashboard, !staff);
@@ -81,6 +99,12 @@ export function OverviewSection() {
   }
 
   const change = data.metrics.clicks_change ?? 0;
+  const employeePace = !isTeamPace(data.expected) ? data.expected : undefined;
+  const teamPace = isTeamPace(data.expected) ? data.expected : undefined;
+  const expectedLeft = employeePace
+    ? liveExpectedRemaining(employeePace, now)
+    : liveTeamRemaining(teamPace?.data, now);
+  const perSession = session.payload?.pace?.clicks_per_session ?? employeePace?.clicks_per_session ?? 0;
 
   if (!staff) {
     return (
@@ -95,27 +119,27 @@ export function OverviewSection() {
             delay={0}
           />
           <MetricCard
+            title="Expected till 6pm"
+            value={expectedLeft.toLocaleString()}
+            change={perSession ? `${perSession} per session` : "computers × tabs"}
+            changeType="neutral"
+            icon={Timer}
+            delay={1}
+          />
+          <MetricCard
+            title="My computers"
+            value={String(employeePace?.computers ?? data.metrics.computers_assigned ?? 0)}
+            change={`${employeePace?.tabs ?? employeePace?.sites ?? data.assignments?.length ?? 0} tabs`}
+            changeType="neutral"
+            icon={Monitor}
+            delay={2}
+          />
+          <MetricCard
             title="Yesterday"
             value={(data.metrics.yesterday_clicks ?? 0).toLocaleString()}
             change="clicks"
             changeType="neutral"
             icon={ClipboardList}
-            delay={1}
-          />
-          <MetricCard
-            title="Still needed"
-            value={String(data.metrics.sessions_needed ?? data.assignments?.reduce((s, a) => s + (a.remaining ?? 0), 0) ?? 0)}
-            change="to hit targets"
-            changeType="neutral"
-            icon={Users}
-            delay={2}
-          />
-          <MetricCard
-            title="My computers"
-            value={String(data.metrics.computers_assigned ?? 0)}
-            change="assigned"
-            changeType="neutral"
-            icon={Monitor}
             delay={3}
           />
         </div>
@@ -133,52 +157,37 @@ export function OverviewSection() {
           <div className="bg-card border border-border rounded-2xl p-5">
             <h3 className="text-base font-semibold mb-1">Today's work</h3>
             <p className="text-xs text-muted-foreground mb-4">
-              Each finished Work Start adds 1 click to every site + keyword below.
+              {employeePace?.multiple_keywords
+                ? `Open every keyword in its own tab on every computer. A finished ${employeePace.session_minutes}-min session adds ${employeePace.computers} click${employeePace.computers === 1 ? "" : "s"} to each keyword.`
+                : `Open one tab per site on every computer. A finished ${employeePace?.session_minutes ?? 5}-min session adds ${employeePace?.computers ?? 0} click${employeePace?.computers === 1 ? "" : "s"} to each site.`}
             </p>
             {(data.assignments || []).length === 0 ? (
               <p className="text-sm text-muted-foreground">No work assigned today.</p>
             ) : (
               <div className="space-y-3">
-                {data.assignments?.map((a) => {
-                  const done = a.click_count ?? 0;
-                  const target = a.target_clicks;
-                  const remaining = a.remaining ?? (target != null ? Math.max(0, target - done) : null);
-                  const pct = target ? Math.min(100, (done / target) * 100) : 0;
-                  return (
-                    <div key={a.id} className="rounded-xl border border-border p-3 space-y-2">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Site</div>
-                        <div className="text-sm font-semibold leading-tight">{a.site_name || "Untitled site"}</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Keyword</div>
-                        <div className="text-sm text-foreground">{a.keyword || "—"}</div>
-                      </div>
-                      <div className="flex items-end justify-between gap-2">
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Done / target</div>
-                          <div className="text-sm font-medium tabular-nums">
-                            {done} / {target ?? "no target"}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          {remaining != null && remaining > 0 ? (
-                            <div className="text-xs font-medium text-warning">Need {remaining} more</div>
-                          ) : target != null ? (
-                            <div className="text-xs font-medium text-accent">Target met</div>
-                          ) : (
-                            <div className="text-xs text-muted-foreground">No target</div>
-                          )}
-                        </div>
-                      </div>
-                      {target ? (
-                        <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-                          <div className="h-full bg-accent" style={{ width: `${pct}%` }} />
-                        </div>
-                      ) : null}
+                {data.assignments?.map((a) => (
+                  <div key={a.id} className="rounded-xl border border-border p-3 space-y-2">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Site</div>
+                      <div className="text-sm font-semibold leading-tight">{a.site_name || "Untitled site"}</div>
                     </div>
-                  );
-                })}
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Keyword</div>
+                      <div className="text-sm text-foreground">{a.keyword || "—"}</div>
+                    </div>
+                    <div className="flex items-end justify-between gap-2">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Clicks today</div>
+                        <div className="text-sm font-medium tabular-nums">{a.click_count ?? 0}</div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {employeePace?.multiple_keywords
+                          ? `+${employeePace.computers} / session`
+                          : "counted per site"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -201,19 +210,19 @@ export function OverviewSection() {
           delay={0}
         />
         <MetricCard
+          title="Expected till 6pm"
+          value={expectedLeft.toLocaleString()}
+          change="live · computers × tabs"
+          changeType="neutral"
+          icon={Timer}
+          delay={1}
+        />
+        <MetricCard
           title="Joined employees"
           value={String(data.metrics.active_employees ?? 0)}
           change="active"
           changeType="neutral"
           icon={Users}
-          delay={1}
-        />
-        <MetricCard
-          title="Pending EOD"
-          value={String(data.metrics.pending_eod ?? 0)}
-          change="not submitted"
-          changeType={(data.metrics.pending_eod ?? 0) > 0 ? "negative" : "positive"}
-          icon={ClipboardList}
           delay={2}
         />
         <MetricCard
@@ -253,9 +262,7 @@ export function OverviewSection() {
         </div>
 
         <div className="bg-card border border-border rounded-xl p-5">
-          <h3 className="text-base font-semibold mb-4">
-            Top today
-          </h3>
+          <h3 className="text-base font-semibold mb-4">Top today</h3>
           <div className="space-y-3">
             {(data.top_performers || []).length === 0 ? (
               <p className="text-sm text-muted-foreground">No reports yet today.</p>
@@ -274,38 +281,70 @@ export function OverviewSection() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="text-base font-semibold mb-3">Pending EOD</h3>
-            {(data.pending_eod || []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">Everyone assigned today has submitted.</p>
-            ) : (
-              <ul className="space-y-2">
-                {data.pending_eod?.map((p) => (
-                  <li key={p.id} className="text-sm flex justify-between">
-                    <span>{p.name}</span>
-                    <span className="text-muted-foreground">{p.unique_id}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="bg-card border border-border rounded-xl p-5">
-            <h3 className="text-base font-semibold mb-3">Unscheduled today</h3>
-            {(data.unscheduled || []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">All joined employees have work today.</p>
-            ) : (
-              <ul className="space-y-2">
-                {data.unscheduled?.map((p) => (
-                  <li key={p.id} className="text-sm flex justify-between">
-                    <span>{p.name}</span>
-                    <span className="text-muted-foreground">{p.unique_id}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="font-semibold">Live expected till 6:00 PM</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Remaining sessions × computers × tabs (sites, or every keyword when Multiple keywords is on).
+          </p>
         </div>
+        {(teamPace?.data || []).length === 0 ? (
+          <p className="p-5 text-sm text-muted-foreground">No joined employees.</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {teamPace?.data.map((row) => {
+              const left = liveExpectedRemaining(row, now);
+              return (
+                <div key={row.employee_id} className="px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-medium">{row.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {row.unique_id} · {row.computers} computer{row.computers === 1 ? "" : "s"} × {row.tabs ?? row.sites} tab{(row.tabs ?? row.sites) === 1 ? "" : "s"} = {row.clicks_per_session}/session
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-semibold tabular-nums">{left.toLocaleString()} left</div>
+                    <div className="text-xs text-muted-foreground">{row.done.toLocaleString()} done</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="text-base font-semibold mb-3">Pending EOD</h3>
+          {(data.pending_eod || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">Everyone assigned today has submitted.</p>
+          ) : (
+            <ul className="space-y-2">
+              {data.pending_eod?.map((p) => (
+                <li key={p.id} className="text-sm flex justify-between">
+                  <span>{p.name}</span>
+                  <span className="text-muted-foreground">{p.unique_id}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="text-base font-semibold mb-3">Unscheduled today</h3>
+          {(data.unscheduled || []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">All joined employees have work today.</p>
+          ) : (
+            <ul className="space-y-2">
+              {data.unscheduled?.map((p) => (
+                <li key={p.id} className="text-sm flex justify-between">
+                  <span>{p.name}</span>
+                  <span className="text-muted-foreground">{p.unique_id}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

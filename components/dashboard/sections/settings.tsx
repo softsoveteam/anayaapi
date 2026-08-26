@@ -8,6 +8,7 @@ import { isStaff } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Logo } from "@/components/brand/logo";
 
@@ -20,12 +21,17 @@ export function SettingsSection() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [sessionMinutes, setSessionMinutes] = useState("5");
+  const [multipleKeywords, setMultipleKeywords] = useState(false);
   const [savingMinutes, setSavingMinutes] = useState(false);
+  const [savingKeywords, setSavingKeywords] = useState(false);
 
   useEffect(() => {
     if (!staff) return;
-    api<{ session_minutes: number }>("/app-settings")
-      .then((res) => setSessionMinutes(String(res.session_minutes)))
+    api<{ session_minutes: number; multiple_keywords?: boolean }>("/app-settings")
+      .then((res) => {
+        setSessionMinutes(String(res.session_minutes));
+        setMultipleKeywords(Boolean(res.multiple_keywords));
+      })
       .catch(() => undefined);
   }, [staff]);
 
@@ -65,16 +71,39 @@ export function SettingsSection() {
     e.preventDefault();
     setSavingMinutes(true);
     try {
-      const res = await api<{ message: string; session_minutes: number }>("/app-settings", {
+      const res = await api<{ message: string; session_minutes: number; multiple_keywords?: boolean }>("/app-settings", {
         method: "PUT",
         body: JSON.stringify({ session_minutes: Number(sessionMinutes) }),
       });
       setSessionMinutes(String(res.session_minutes));
+      if (res.multiple_keywords != null) setMultipleKeywords(Boolean(res.multiple_keywords));
       toast.success(`Work sessions are now ${res.session_minutes} minutes`);
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
       setSavingMinutes(false);
+    }
+  }
+
+  async function onMultipleKeywords(checked: boolean) {
+    setMultipleKeywords(checked);
+    setSavingKeywords(true);
+    try {
+      const res = await api<{ message: string; multiple_keywords?: boolean }>("/app-settings", {
+        method: "PUT",
+        body: JSON.stringify({ multiple_keywords: checked }),
+      });
+      setMultipleKeywords(Boolean(res.multiple_keywords));
+      toast.success(
+        checked
+          ? "Multiple keywords on — each keyword is a tab and a click per computer"
+          : "Multiple keywords off — one tab and one click per site per computer"
+      );
+    } catch (err) {
+      setMultipleKeywords(!checked);
+      toast.error(errorMessage(err));
+    } finally {
+      setSavingKeywords(false);
     }
   }
 
@@ -91,8 +120,8 @@ export function SettingsSection() {
         <form onSubmit={onSessionMinutes} className="bg-card border border-border rounded-xl p-5 space-y-3">
           <h3 className="font-semibold">Employee work timer</h3>
           <p className="text-sm text-muted-foreground">
-            Employees press Work Start on their dashboard. When this reverse timer finishes, each assigned site
-            automatically receives 1 click. They cannot enter clicks by hand.
+            Employees press Work Start on their dashboard. When this reverse timer finishes, clicks are counted
+            automatically. They cannot enter clicks by hand.
           </p>
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
@@ -112,6 +141,29 @@ export function SettingsSection() {
             </Button>
           </div>
         </form>
+      ) : null}
+
+      {staff ? (
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold">Multiple keywords</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                When on, the employee opens every assigned keyword in its own tab. Clicks = keywords × computers.
+                Example: soundbuttons.com with 2 keywords on 3 computers = 6 clicks per session.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                When off, they open one tab per site. Extra keywords on the same site do not add extra clicks.
+              </p>
+            </div>
+            <Switch
+              checked={multipleKeywords}
+              disabled={savingKeywords}
+              onCheckedChange={onMultipleKeywords}
+              className="data-[state=checked]:bg-accent"
+            />
+          </div>
+        </div>
       ) : null}
 
       <div className="grid md:grid-cols-2 gap-6">

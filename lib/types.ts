@@ -1,3 +1,5 @@
+import type { Pace } from "./pace";
+
 export type Role = "admin" | "manager" | "employee";
 
 export type EmployeeStatus =
@@ -87,7 +89,7 @@ export type TodayTask = {
   site_url: string;
   keyword_id: number;
   keyword: string;
-  target_clicks: number | null;
+  target_clicks?: number | null;
   click_count: number | null;
   remaining?: number | null;
   notes: string | null;
@@ -106,6 +108,7 @@ export const STATUS_LABELS: Record<EmployeeStatus, string> = {
 export type WorkSessionSite = {
   site_id: number;
   site_name: string | null;
+  keyword?: string | null;
   assignment_id: number;
 };
 
@@ -118,6 +121,7 @@ export type WorkSession = {
   ends_at: string;
   finished_at: string | null;
   site_count: number;
+  computer_count?: number;
   clicks_awarded: number;
   sites: WorkSessionSite[];
 };
@@ -126,6 +130,7 @@ export type WorkSessionPayload = {
   session_minutes: number;
   today_clicks: number;
   today_sessions: number;
+  pace?: Pace;
   current: WorkSession | null;
   logs: WorkSession[];
 };

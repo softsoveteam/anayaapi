@@ -49,7 +49,7 @@ export function SitesSection() {
   const [employees, setEmployees] = useState<User[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState("");
-  const [rows, setRows] = useState([{ site_id: "", keyword_id: "", target_clicks: "" }]);
+  const [rows, setRows] = useState([{ site_id: "", keyword_id: "" }]);
 
   async function loadSites() {
     const res = await api<{ data: Site[] }>("/sites");
@@ -119,7 +119,6 @@ export function SitesSection() {
         .map((r) => ({
           site_id: Number(r.site_id),
           keyword_id: Number(r.keyword_id),
-          target_clicks: r.target_clicks ? Number(r.target_clicks) : null,
         }));
       await api("/assignments", {
         method: "POST",
@@ -127,7 +126,7 @@ export function SitesSection() {
       });
       toast.success("Work assigned");
       setAssignOpen(false);
-      setRows([{ site_id: "", keyword_id: "", target_clicks: "" }]);
+      setRows([{ site_id: "", keyword_id: "" }]);
       await loadAssignments();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -169,7 +168,7 @@ export function SitesSection() {
               className="bg-accent text-accent-foreground hover:bg-accent/90"
               onClick={() => {
                 setEmployeeId("");
-                setRows([{ site_id: "", keyword_id: "", target_clicks: "" }]);
+                setRows([{ site_id: "", keyword_id: "" }]);
                 setAssignOpen(true);
               }}
             >
@@ -191,8 +190,7 @@ export function SitesSection() {
                 <TableHead>Employee</TableHead>
                 <TableHead>Site</TableHead>
                 <TableHead>Keyword</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>Reported</TableHead>
+                <TableHead>Clicks</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead />
               </TableRow>
@@ -206,7 +204,6 @@ export function SitesSection() {
                   </TableCell>
                   <TableCell>{a.site.name}</TableCell>
                   <TableCell>{a.keyword}</TableCell>
-                  <TableCell>{a.target_clicks ?? "—"}</TableCell>
                   <TableCell>{a.report?.click_count ?? "—"}</TableCell>
                   <TableCell>{a.is_auto_copied ? "Auto" : "Manual"}</TableCell>
                   <TableCell>
@@ -299,7 +296,7 @@ export function SitesSection() {
             {rows.map((row, i) => {
               const site = sites.find((s) => String(s.id) === row.site_id);
               return (
-                <div key={i} className="grid grid-cols-3 gap-2">
+                <div key={i} className="grid grid-cols-2 gap-2">
                   <Select
                     value={row.site_id}
                     onValueChange={(v) => {
@@ -330,23 +327,13 @@ export function SitesSection() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input
-                    type="number"
-                    placeholder="Target"
-                    value={row.target_clicks}
-                    onChange={(e) => {
-                      const next = [...rows];
-                      next[i] = { ...next[i], target_clicks: e.target.value };
-                      setRows(next);
-                    }}
-                  />
                 </div>
               );
             })}
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setRows([...rows, { site_id: "", keyword_id: "", target_clicks: "" }])}
+              onClick={() => setRows([...rows, { site_id: "", keyword_id: "" }])}
             >
               Add another site
             </Button>
