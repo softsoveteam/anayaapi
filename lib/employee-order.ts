@@ -20,3 +20,11 @@ export function sortEmployees<T extends Pick<User, "unique_id"> & { role?: strin
     return a.unique_id.localeCompare(b.unique_id);
   });
 }
+
+export function isAdminAccount(user: { role?: string | null; unique_id?: string }) {
+  return user.role === "admin" || user.unique_id === "ANAYA-ADMIN";
+}
+
+export function directoryEmployees<T extends Pick<User, "unique_id"> & { role?: string | null }>(list: T[]): T[] {
+  return sortEmployees(list.filter((user) => !isAdminAccount(user)));
+}

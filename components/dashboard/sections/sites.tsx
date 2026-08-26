@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
-import type { Assignment, Site, User } from "@/lib/types";
-import { SiteMark, siteDomain } from "@/components/dashboard/site-mark";
+import type { Assignment, Keyword, Site, User } from "@/lib/types";
+import { directoryEmployees } from "@/lib/employee-order";
+import { SiteMark, siteDomain, siteHref } from "@/components/dashboard/site-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -40,9 +42,13 @@ function today() {
 export function SitesSection() {
   const [sites, setSites] = useState<Site[]>([]);
   const [siteOpen, setSiteOpen] = useState(false);
+  const [editingSite, setEditingSite] = useState<Site | null>(null);
+  const [viewingSite, setViewingSite] = useState<Site | null>(null);
   const [kwOpen, setKwOpen] = useState<Site | null>(null);
   const [siteForm, setSiteForm] = useState({ name: "", url: "", notes: "" });
   const [keyword, setKeyword] = useState("");
+  const [editingKeyword, setEditingKeyword] = useState<Keyword | null>(null);
+  const [keywordText, setKeywordText] = useState("");
 
   const [date, setDate] = useState(today());
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -51,10 +57,16 @@ export function SitesSection() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState("");
   const [rows, setRows] = useState([{ site_id: "", keyword_id: "" }]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<Assignment | null>(null);
+  const [editEmployeeId, setEditEmployeeId] = useState("");
+  const [editSiteId, setEditSiteId] = useState("");
+  const [editKeywordId, setEditKeywordId] = useState("");
 
   async function loadSites() {
     const res = await api<{ data: Site[] }>("/sites");
     setSites(res.data);
+    setViewingSite((current) => (current ? res.data.find((s) => s.id === current.id) ?? null : null));
   }
 
   async function loadAssignments() {
@@ -65,19 +77,64 @@ export function SitesSection() {
 
   useEffect(() => {
     loadSites().catch((e) => toast.error(errorMessage(e)));
-    api<{ data: User[] }>("/employees").then((r) => setEmployees(r.data)).catch(() => undefined);
+    api<{ data: User[] }>("/employees").then((r) => setEmployees(directoryEmployees(r.data ?? []))).catch(() => undefined);
   }, []);
 
   useEffect(() => {
     loadAssignments().catch((e) => toast.error(errorMessage(e)));
   }, [date]);
 
+  function openCreateSite() {
+    setEditingSite(null);
+    setSiteForm({ name: "", url: "", notes: "" });
+    setSiteOpen(true);
+  }
+
+  function openEditSite(site: Site) {
+    setViewingSite(null);
+    setEditingSite(site);
+    setSiteForm({ name: site.name || "", url: site.url || "", notes: site.notes || "" });
+    setSiteOpen(true);
+  }
+
   async function saveSite() {
     try {
-      await api("/sites", { method: "POST", body: JSON.stringify(siteForm) });
-      toast.success("Site added");
+      if (editingSite) {
+        await api(`/sites/${editingSite.id}`, { method: "PUT", body: JSON.stringify(siteForm) });
+        toast.success("Site updated");
+      } else {
+        await api("/sites", { method: "POST", body: JSON.stringify(siteForm) });
+        toast.success("Site added");
+      }
       setSiteOpen(false);
+      setEditingSite(null);
       setSiteForm({ name: "", url: "", notes: "" });
+      await loadSites();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  }
+
+  async function removeKeyword(id: number) {
+    try {
+      await api(`/keywords/${id}`, { method: "DELETE" });
+      toast.success("Keyword removed");
+      await loadSites();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  }
+
+  async function saveKeywordEdit() {
+    if (!editingKeyword) return;
+    try {
+      await api(`/keywords/${editingKeyword.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ keyword: keywordText.trim() }),
+      });
+      toast.success("Keyword updated");
+      setEditingKeyword(null);
+      setKeywordText("");
       await loadSites();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -137,6 +194,34 @@ export function SitesSection() {
   async function removeAssignment(id: number) {
     try {
       await api(`/assignments/${id}`, { method: "DELETE" });
+      await loadAssignments();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  }
+
+  function openEdit(assignment: Assignment) {
+    setEditing(assignment);
+    setEditEmployeeId(String(assignment.employee_id));
+    setEditSiteId(String(assignment.site_id));
+    setEditKeywordId(String(assignment.keyword_id));
+    setEditOpen(true);
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    try {
+      await api(`/assignments/${editing.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          employee_id: Number(editEmployeeId),
+          site_id: Number(editSiteId),
+          keyword_id: Number(editKeywordId),
+        }),
+      });
+      toast.success("Assignment updated");
+      setEditOpen(false);
+      setEditing(null);
       await loadAssignments();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -208,9 +293,14 @@ export function SitesSection() {
                   <TableCell>{a.report?.click_count ?? "—"}</TableCell>
                   <TableCell>{a.is_auto_copied ? "Auto" : "Manual"}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon-sm" onClick={() => removeAssignment(a.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon-sm" onClick={() => openEdit(a)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon-sm" onClick={() => removeAssignment(a.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -221,7 +311,7 @@ export function SitesSection() {
 
       <TabsContent value="sites" className="space-y-4 mt-4">
         <div className="flex justify-end">
-          <Button onClick={() => setSiteOpen(true)} className="bg-accent text-accent-foreground hover:bg-accent/90">
+          <Button onClick={openCreateSite} className="bg-accent text-accent-foreground hover:bg-accent/90">
             <Plus className="w-4 h-4" /> Add site
           </Button>
         </div>
@@ -239,9 +329,19 @@ export function SitesSection() {
                     <p className="text-xs text-muted-foreground break-all">{site.url}</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => { setKeyword(""); setKwOpen(site); }}>
-                  + Keyword
-                </Button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setViewingSite(site)}>
+                    <Eye className="w-4 h-4" />
+                    View
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => openEditSite(site)}>
+                    <Pencil className="w-4 h-4" />
+                    Edit
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => { setKeyword(""); setKwOpen(site); }}>
+                    + Keyword
+                  </Button>
+                </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 {site.keywords.length === 0 ? (
@@ -259,9 +359,9 @@ export function SitesSection() {
         </div>
       </TabsContent>
 
-      <Dialog open={siteOpen} onOpenChange={setSiteOpen}>
+      <Dialog open={siteOpen} onOpenChange={(open) => { setSiteOpen(open); if (!open) setEditingSite(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add site</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingSite ? "Edit site" : "Add site"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Name</Label>
@@ -270,6 +370,10 @@ export function SitesSection() {
             <div className="space-y-1.5">
               <Label>URL</Label>
               <Input value={siteForm.url} onChange={(e) => setSiteForm({ ...siteForm, url: e.target.value })} placeholder="https://soundbuttons.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea value={siteForm.notes} onChange={(e) => setSiteForm({ ...siteForm, notes: e.target.value })} />
             </div>
           </div>
           <DialogFooter>
@@ -284,6 +388,110 @@ export function SitesSection() {
           <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="search phrase" />
           <DialogFooter>
             <Button onClick={addKeyword} className="bg-accent text-accent-foreground hover:bg-accent/90">Add</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(viewingSite)} onOpenChange={(open) => { if (!open) setViewingSite(null); }}>
+        <DialogContent className="max-w-lg">
+          {viewingSite ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Site details</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <SiteMark
+                    domain={viewingSite.domain || siteDomain(viewingSite.url)}
+                    favicon={viewingSite.favicon_url}
+                    name={viewingSite.name}
+                  />
+                  <div className="min-w-0">
+                    <div className="font-semibold leading-tight">
+                      {viewingSite.domain || siteDomain(viewingSite.url) || viewingSite.name}
+                    </div>
+                    {viewingSite.name ? (
+                      <p className="text-sm text-muted-foreground">{viewingSite.name}</p>
+                    ) : null}
+                    {siteHref(viewingSite.url) ? (
+                      <a
+                        href={siteHref(viewingSite.url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-accent break-all hover:underline"
+                      >
+                        {viewingSite.url}
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+                {viewingSite.notes ? (
+                  <p className="text-sm whitespace-pre-wrap">{viewingSite.notes}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No notes.</p>
+                )}
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Keywords</div>
+                  {viewingSite.keywords.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No keywords yet.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {viewingSite.keywords.map((k) => (
+                        <span key={k.id} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-secondary">
+                          {k.keyword}
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => {
+                              setEditingKeyword(k);
+                              setKeywordText(k.keyword);
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => removeKeyword(k.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setKeyword("");
+                    setKwOpen(viewingSite);
+                  }}
+                >
+                  + Keyword
+                </Button>
+                <Button
+                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                  onClick={() => openEditSite(viewingSite)}
+                >
+                  Edit site
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(editingKeyword)} onOpenChange={(open) => { if (!open) setEditingKeyword(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit keyword</DialogTitle></DialogHeader>
+          <Input value={keywordText} onChange={(e) => setKeywordText(e.target.value)} />
+          <DialogFooter>
+            <Button onClick={saveKeywordEdit} className="bg-accent text-accent-foreground hover:bg-accent/90">
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -347,6 +555,67 @@ export function SitesSection() {
           </div>
           <DialogFooter>
             <Button onClick={saveAssign} className="bg-accent text-accent-foreground hover:bg-accent/90">Assign</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) setEditing(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit assignment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Employee</Label>
+              <Select value={editEmployeeId} onValueChange={setEditEmployeeId}>
+                <SelectTrigger><SelectValue placeholder="Employee" /></SelectTrigger>
+                <SelectContent>
+                  {joined.map((e) => (
+                    <SelectItem key={e.id} value={String(e.id)}>{e.name} ({e.unique_id})</SelectItem>
+                  ))}
+                  {editing && !joined.some((e) => e.id === editing.employee_id) ? (
+                    <SelectItem value={String(editing.employee_id)}>
+                      {editing.employee.name} ({editing.employee.unique_id})
+                    </SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Site</Label>
+              <Select
+                value={editSiteId}
+                onValueChange={(v) => {
+                  setEditSiteId(v);
+                  const site = sites.find((s) => String(s.id) === v);
+                  const keep = site?.keywords.some((k) => String(k.id) === editKeywordId);
+                  if (!keep) setEditKeywordId("");
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Site" /></SelectTrigger>
+                <SelectContent>
+                  {sites.map((s) => (
+                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Keyword</Label>
+              <Select value={editKeywordId} onValueChange={setEditKeywordId}>
+                <SelectTrigger><SelectValue placeholder="Keyword" /></SelectTrigger>
+                <SelectContent>
+                  {(sites.find((s) => String(s.id) === editSiteId)?.keywords || []).map((k) => (
+                    <SelectItem key={k.id} value={String(k.id)}>{k.keyword}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={saveEdit} className="bg-accent text-accent-foreground hover:bg-accent/90">
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -34,7 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth-context";
-import { sortEmployees } from "@/lib/employee-order";
+import { directoryEmployees } from "@/lib/employee-order";
 
 const emptyForm = {
   unique_id: "",
@@ -64,7 +64,7 @@ export function EmployeesSection() {
 
   async function load() {
     const res = await api<{ data: User[] }>(`/employees?search=${encodeURIComponent(search)}`);
-    setEmployees(sortEmployees(res.data ?? []));
+    setEmployees(directoryEmployees(res.data ?? []));
   }
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export function EmployeesSection() {
   }, [search]);
 
   function upsertEmployee(user: User) {
-    setEmployees((prev) => sortEmployees([...prev.filter((e) => e.id !== user.id), user]));
+    setEmployees((prev) => directoryEmployees([...prev.filter((e) => e.id !== user.id), user]));
   }
 
   async function openCreate() {

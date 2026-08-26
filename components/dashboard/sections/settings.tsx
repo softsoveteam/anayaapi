@@ -6,7 +6,7 @@ import { api, authApi, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { isStaff } from "@/lib/types";
 import type { User } from "@/lib/types";
-import { sortEmployees } from "@/lib/employee-order";
+import { directoryEmployees } from "@/lib/employee-order";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +50,7 @@ export function SettingsSection() {
       })
       .catch(() => undefined);
     api<{ data: User[] }>("/employees")
-      .then((res) => setEmployees(sortEmployees(res.data ?? [])))
+      .then((res) => setEmployees(directoryEmployees(res.data ?? [])))
       .catch(() => undefined);
   }, [staff]);
 
