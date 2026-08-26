@@ -18,6 +18,7 @@ import {
   Settings,
   ClipboardList,
   CalendarDays,
+  LayoutGrid,
   Wallet,
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ interface SidebarProps {
 
 const allNav: { id: Section; label: string; icon: ElementType; roles: Role[] }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard, roles: ["admin", "manager", "employee"] },
+  { id: "floor", label: "Floor", icon: LayoutGrid, roles: ["admin", "manager"] },
   { id: "employees", label: "Employees", icon: Users, roles: ["admin", "manager"] },
   { id: "computers", label: "Computers", icon: Monitor, roles: ["admin", "manager", "employee"] },
   { id: "sites", label: "Sites / Work", icon: Globe, roles: ["admin", "manager"] },

@@ -89,6 +89,7 @@ export type TodayTask = {
   keyword: string;
   target_clicks: number | null;
   click_count: number | null;
+  remaining?: number | null;
   notes: string | null;
   submitted_at: string | null;
 };
@@ -144,11 +145,19 @@ export type LeaveRequest = {
   start_date: string;
   end_date: string;
   days: number;
+  portion?: number;
+  half?: "morning" | "afternoon" | null;
   reason: string | null;
   status: "pending" | "approved" | "rejected" | string;
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string | null;
+};
+
+export type LeaveItem = {
+  date: string;
+  portion: number;
+  kind: "paid" | "unpaid" | "mixed" | string;
 };
 
 export type OvertimeSession = {
@@ -174,12 +183,41 @@ export type PayrollRow = {
   leave_days: number;
   unpaid_leave_days: number;
   leave_dates: string[];
+  leave_items?: LeaveItem[];
   leave_deduction: number;
   overtime_seconds: number;
   overtime_hours: number;
   overtime_pay: number;
   net: number;
+  frozen?: boolean;
+  frozen_at?: string | null;
   overtime_sessions?: OvertimeSession[];
+};
+
+export type Attendance = {
+  employee_id?: number;
+  name?: string;
+  unique_id?: string;
+  status: string;
+  label: string;
+  late: boolean;
+  in_at: string | null;
+  last_at: string | null;
+  remaining_seconds?: number;
+};
+
+export type FloorPayload = {
+  now: string;
+  counts: {
+    on_timer: number;
+    idle: number;
+    not_started: number;
+    late: number;
+    on_leave: number;
+    working?: number;
+    holiday?: number;
+  };
+  data: Attendance[];
 };
 
 export type CalendarPayload = {

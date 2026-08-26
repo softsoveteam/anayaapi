@@ -82,10 +82,6 @@ function EmployeeReport() {
     );
   }
 
-  const uniqueSites = Array.from(
-    new Map(payload.data.map((row) => [row.site_id, row])).values()
-  );
-
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
@@ -101,22 +97,37 @@ function EmployeeReport() {
           <div className="text-3xl font-bold mt-1">{session.payload?.today_sessions ?? 0}</div>
         </div>
       </div>
-      <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-        <h3 className="font-semibold">Per site</h3>
-        {uniqueSites.map((row) => (
-          <div key={row.assignment_id} className="flex items-center justify-between gap-4 py-2 border-b border-border last:border-0">
-            <div>
-              <div className="font-medium">{row.site_name}</div>
-              <div className="text-xs text-muted-foreground">{row.keyword}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-bold tabular-nums">{row.click_count ?? 0}</div>
-              {row.target_clicks ? (
-                <div className="text-xs text-muted-foreground">target {row.target_clicks}</div>
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <h3 className="font-semibold">Today's sites and keywords</h3>
+        {payload.data.map((row) => {
+          const done = row.click_count ?? 0;
+          const remaining = row.remaining ?? (row.target_clicks != null ? Math.max(0, row.target_clicks - done) : null);
+          return (
+            <div key={row.assignment_id} className="rounded-xl border border-border p-4 space-y-2">
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Site</div>
+                  <div className="font-semibold">{row.site_name || "Untitled site"}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Keyword</div>
+                  <div className="font-medium">{row.keyword || "—"}</div>
+                </div>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Done / target</span>
+                <span className="tabular-nums font-medium">
+                  {done} / {row.target_clicks ?? "no target"}
+                </span>
+              </div>
+              {remaining != null && remaining > 0 ? (
+                <div className="text-xs text-warning font-medium">Need {remaining} more sessions</div>
+              ) : row.target_clicks != null ? (
+                <div className="text-xs text-accent font-medium">Target met</div>
               ) : null}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <SessionLogs logs={session.payload?.logs ?? []} />
     </div>

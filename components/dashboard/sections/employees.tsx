@@ -103,6 +103,7 @@ export function EmployeesSection() {
       if (!payload.password) delete payload.password;
       if (role !== "admin") delete payload.role;
       payload.monthly_salary = form.monthly_salary === "" ? null : Number(form.monthly_salary);
+      if (editing) delete payload.unique_id;
 
       if (editing) {
         await api(`/employees/${editing.id}`, {
@@ -218,7 +219,14 @@ export function EmployeesSection() {
           <div className="px-4 pb-6 space-y-3">
             {editing ? <StatusBadge status={form.status} /> : null}
             <Field label="Unique ID">
-              <Input value={form.unique_id} onChange={(e) => setForm({ ...form, unique_id: e.target.value })} />
+              <Input
+                value={form.unique_id}
+                readOnly
+                className="font-mono bg-secondary/50"
+              />
+              <p className="text-xs text-muted-foreground">
+                {editing ? "IDs are assigned in sequence and cannot be changed." : "Next ID is assigned automatically."}
+              </p>
             </Field>
             <Field label="Full name">
               <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

@@ -14,7 +14,6 @@ import { Logo } from "@/components/brand/logo";
 export function SettingsSection() {
   const { user, refresh, role } = useAuth();
   const staff = isStaff(role);
-  const [uniqueId, setUniqueId] = useState(user?.unique_id ?? "");
   const [name, setName] = useState(user?.name ?? "");
   const [profilePassword, setProfilePassword] = useState("");
   const [current, setCurrent] = useState("");
@@ -34,11 +33,10 @@ export function SettingsSection() {
     e.preventDefault();
     try {
       await authApi.profile({
-        unique_id: uniqueId.trim(),
         name: name.trim(),
         current_password: profilePassword,
       });
-      toast.success("ID and name updated");
+      toast.success("Name updated");
       setProfilePassword("");
       await refresh();
     } catch (err) {
@@ -117,7 +115,7 @@ export function SettingsSection() {
       ) : null}
 
       <div className="grid md:grid-cols-2 gap-6">
-        <form onSubmit={onProfile} className="bg-card border border-border rounded-xl p-5 space-y-3">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
           <h3 className="font-semibold">Account</h3>
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Role</span>
@@ -129,23 +127,33 @@ export function SettingsSection() {
           </div>
           <div className="space-y-1.5">
             <Label>Unique ID</Label>
-            <Input value={uniqueId} onChange={(e) => setUniqueId(e.target.value)} required />
+            <Input value={user.unique_id} readOnly className="font-mono bg-secondary/50" />
+            <p className="text-xs text-muted-foreground">Assigned automatically in sequence. It cannot be changed.</p>
           </div>
-          <div className="space-y-1.5">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Current password</Label>
-            <Input
-              type="password"
-              value={profilePassword}
-              onChange={(e) => setProfilePassword(e.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit">Update ID</Button>
-        </form>
+          {staff ? (
+            <form onSubmit={onProfile} className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Name</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Current password</Label>
+                <Input
+                  type="password"
+                  value={profilePassword}
+                  onChange={(e) => setProfilePassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit">Update name</Button>
+            </form>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input value={user.name} readOnly className="bg-secondary/50" />
+            </div>
+          )}
+        </div>
 
         <form onSubmit={onPassword} className="bg-card border border-border rounded-xl p-5 space-y-3">
           <h3 className="font-semibold">Change password</h3>

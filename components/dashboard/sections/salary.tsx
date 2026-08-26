@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { api, errorMessage } from "@/lib/api";
+import { ChevronLeft, ChevronRight, Download, Snowflake } from "lucide-react";
+import { api, downloadFile, errorMessage } from "@/lib/api";
 import { currentMonth, inr, shiftMonth } from "@/lib/money";
 import type { PayrollRow } from "@/lib/types";
 import { isStaff } from "@/lib/types";
@@ -21,6 +21,10 @@ import {
 type SalaryIndex = {
   month: string;
   calendar_days: number;
+  live?: boolean;
+  frozen?: boolean;
+  frozen_count?: number;
+  previous_month?: string;
   totals: { employees: number; base: number; leave_deduction: number; overtime_pay: number; net: number };
   data: PayrollRow[];
 };
@@ -28,6 +32,18 @@ type SalaryIndex = {
 function monthLabel(month: string) {
   const [y, m] = month.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+function payslipName(row: { unique_id?: string; month: string }) {
+  return `payslip-${row.unique_id || "employee"}-${row.month}.pdf`;
+}
+
+async function downloadPayslip(path: string, filename: string) {
+  try {
+    await downloadFile(path, filename);
+  } catch (e) {
+    toast.error(errorMessage(e, "Could not download payslip"));
+  }
 }
 
 export function SalarySection() {
@@ -53,24 +69,59 @@ function MonthNav({ month, onChange }: { month: string; onChange: (m: string) =>
 function AdminSalary() {
   const [month, setMonth] = useState(currentMonth());
   const [report, setReport] = useState<SalaryIndex | null>(null);
+  const [freezing, setFreezing] = useState(false);
+
+  async function load() {
+    const res = await api<SalaryIndex>(`/salary?month=${month}`);
+    setReport(res);
+  }
 
   useEffect(() => {
-    api<SalaryIndex>(`/salary?month=${month}`)
-      .then(setReport)
-      .catch((e) => toast.error(errorMessage(e)));
+    load().catch((e) => toast.error(errorMessage(e)));
   }, [month]);
+
+  async function freezeLastMonth() {
+    setFreezing(true);
+    try {
+      const res = await api<{ month: string; frozen: number; report: SalaryIndex }>("/salary/freeze", { method: "POST" });
+      toast.success(
+        res.frozen > 0
+          ? `Froze ${res.frozen} snapshot(s) for ${monthLabel(res.month)}`
+          : `${monthLabel(res.month)} was already frozen`
+      );
+      if (month === res.month) setReport(res.report);
+      else await load();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setFreezing(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <MonthNav month={month} onChange={setMonth} />
-        <p className="text-sm text-muted-foreground">
-          Day rate = monthly salary ÷ {report?.calendar_days ?? "—"} calendar days. OT after 6:00 PM is 2×.
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            Day rate = monthly salary ÷ {report?.calendar_days ?? "—"} calendar days. OT after 6:00 PM is 2×.
+          </p>
+          <Button variant="outline" onClick={freezeLastMonth} disabled={freezing}>
+            <Snowflake className="w-4 h-4" />
+            {freezing ? "Freezing..." : "Freeze last month"}
+          </Button>
+        </div>
       </div>
 
       {report ? (
         <>
+          <div className="text-xs text-muted-foreground">
+            {report.live
+              ? "This month is live and updates with Work Start."
+              : report.frozen
+                ? "This month is frozen. Later sessions do not change it."
+                : `${report.frozen_count ?? 0} of ${report.data.length} employees frozen.`}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Stat label="Employees" value={String(report.totals.employees)} />
             <Stat label="Base payroll" value={inr(report.totals.base)} />
@@ -89,6 +140,7 @@ function AdminSalary() {
                   <TableHead className="text-right">OT hours</TableHead>
                   <TableHead className="text-right">OT pay</TableHead>
                   <TableHead className="text-right">Net</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -96,7 +148,10 @@ function AdminSalary() {
                   <TableRow key={row.employee_id}>
                     <TableCell>
                       <div className="font-medium">{row.name}</div>
-                      <div className="text-xs text-muted-foreground">{row.unique_id}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {row.unique_id}
+                        {row.frozen ? " · Frozen" : ""}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">{inr(row.base)}</TableCell>
                     <TableCell className="text-right">{row.paid_leave_used}/{row.paid_leave_quota}</TableCell>
@@ -105,6 +160,18 @@ function AdminSalary() {
                     <TableCell className="text-right">{row.overtime_hours}</TableCell>
                     <TableCell className="text-right">{inr(row.overtime_pay)}</TableCell>
                     <TableCell className="text-right font-semibold text-accent">{inr(row.net)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          downloadPayslip(`/salary/${row.employee_id}/payslip?month=${month}`, payslipName(row))
+                        }
+                      >
+                        <Download className="w-4 h-4" />
+                        Download
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -132,7 +199,21 @@ function EmployeeEarnings() {
 
   return (
     <div className="space-y-6">
-      <MonthNav month={month} onChange={setMonth} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <MonthNav month={month} onChange={setMonth} />
+        <Button
+          variant="outline"
+          onClick={() => downloadPayslip(`/my/earnings.pdf?month=${month}`, payslipName(row))}
+        >
+          <Download className="w-4 h-4" />
+          Download payslip
+        </Button>
+      </div>
+      {row.frozen ? (
+        <div className="text-xs text-muted-foreground">This month is frozen. Later Work Start sessions do not change it.</div>
+      ) : (
+        <div className="text-xs text-muted-foreground">Live figure for this month.</div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat label="Base salary" value={inr(row.base)} sub={`${row.calendar_days} days · ${inr(row.day_rate)} / day`} />
         <Stat label="Paid leave used" value={`${row.paid_leave_used}/${row.paid_leave_quota}`} sub={`${row.leave_days} leave day${row.leave_days === 1 ? "" : "s"} this month`} />
@@ -149,13 +230,13 @@ function EmployeeEarnings() {
         </div>
         <div className="bg-card border border-border rounded-xl p-5 space-y-2">
           <h3 className="font-semibold">Approved leave dates</h3>
-          {row.leave_dates.length === 0 ? (
+          {!(row.leave_items || []).length && row.leave_dates.length === 0 ? (
             <p className="text-sm text-muted-foreground">No approved leave this month.</p>
           ) : (
-            row.leave_dates.map((d, i) => (
-              <div key={d} className="text-sm flex justify-between">
-                <span>{d}</span>
-                <span className="text-muted-foreground">{i === 0 ? "Paid" : "Deducted"}</span>
+            (row.leave_items || row.leave_dates.map((date) => ({ date, portion: 1, kind: "paid" }))).map((item) => (
+              <div key={item.date} className="text-sm flex justify-between">
+                <span>{item.date}{item.portion < 1 ? ` · ${item.portion} day` : ""}</span>
+                <span className="text-muted-foreground capitalize">{item.kind}</span>
               </div>
             ))
           )}

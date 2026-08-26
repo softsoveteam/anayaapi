@@ -11,6 +11,7 @@ import { SitesSection } from "@/components/dashboard/sections/sites";
 import { ReportsSection } from "@/components/dashboard/sections/reports";
 import { AnalyticsSection } from "@/components/dashboard/sections/analytics";
 import { CalendarSection } from "@/components/dashboard/sections/calendar";
+import { FloorSection } from "@/components/dashboard/sections/floor";
 import { SalarySection } from "@/components/dashboard/sections/salary";
 import { SettingsSection } from "@/components/dashboard/sections/settings";
 import { Logo } from "@/components/brand/logo";
@@ -19,6 +20,7 @@ import { isStaff } from "@/lib/types";
 
 export type Section =
   | "overview"
+  | "floor"
   | "employees"
   | "computers"
   | "sites"
@@ -39,7 +41,7 @@ export default function Dashboard() {
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (!isStaff(role) && (activeSection === "employees" || activeSection === "sites" || activeSection === "analytics")) {
+    if (!isStaff(role) && (activeSection === "employees" || activeSection === "sites" || activeSection === "analytics" || activeSection === "floor")) {
       setActiveSection("overview");
     }
   }, [role, activeSection]);
@@ -57,6 +59,8 @@ export default function Dashboard() {
     switch (activeSection) {
       case "overview":
         return <OverviewSection />;
+      case "floor":
+        return <FloorSection />;
       case "employees":
         return <EmployeesSection />;
       case "computers":

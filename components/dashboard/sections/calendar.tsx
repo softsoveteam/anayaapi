@@ -41,6 +41,19 @@ function inRange(date: string, start: string, end: string) {
   return date >= start && date <= end;
 }
 
+function leaveSlot(leave: LeaveRequest) {
+  if (leave.half === "morning") return "Morning";
+  if (leave.half === "afternoon") return "Afternoon";
+  return leave.days === 1 ? "Full day" : `${leave.days} days`;
+}
+
+function leaveLine(leave: LeaveRequest, withName = false) {
+  const who = withName && leave.employee_name ? ` · ${leave.employee_name}` : "";
+  const slot = leave.half === "morning" ? " AM" : leave.half === "afternoon" ? " PM" : "";
+  const status = leave.status === "pending" ? "Leave pending" : "On leave";
+  return `${status}${slot}${who}`;
+}
+
 export function CalendarSection() {
   const { role, user } = useAuth();
   const staff = isStaff(role);
@@ -49,6 +62,7 @@ export function CalendarSection() {
   const [selectStart, setSelectStart] = useState<string | null>(null);
   const [selectEnd, setSelectEnd] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [half, setHalf] = useState<"full" | "morning" | "afternoon">("full");
   const [holidayOpen, setHolidayOpen] = useState(false);
   const [holidayForm, setHolidayForm] = useState({ date: todayIso(), name: "", notes: "" });
 
@@ -107,14 +121,19 @@ export function CalendarSection() {
     }
   }
 
+  const singleDay = Boolean(selectStart && (!selectEnd || selectEnd === selectStart));
+
   async function applyLeave() {
     if (!selectStart) return;
+    const end = selectEnd || selectStart;
+    const sameDay = end === selectStart;
     try {
       await api("/my/leaves", {
         method: "POST",
         body: JSON.stringify({
           start_date: selectStart,
-          end_date: selectEnd || selectStart,
+          end_date: end,
+          half: sameDay && half !== "full" ? half : null,
           reason: reason || null,
         }),
       });
@@ -122,6 +141,7 @@ export function CalendarSection() {
       setSelectStart(null);
       setSelectEnd(null);
       setReason("");
+      setHalf("full");
       await load();
     } catch (e) {
       toast.error(errorMessage(e));
@@ -239,8 +259,7 @@ export function CalendarSection() {
                   {holiday ? <div className="text-[10px] text-chart-3 mt-1 leading-tight">{holiday.name}</div> : null}
                   {dayLeaves.map((l) => (
                     <div key={l.id} className="text-[10px] mt-1 leading-tight text-muted-foreground">
-                      {l.status === "pending" ? "Leave pending" : "On leave"}
-                      {staff && l.employee_name ? ` · ${l.employee_name}` : ""}
+                      {leaveLine(l, staff)}
                     </div>
                   ))}
                 </button>
@@ -259,18 +278,35 @@ export function CalendarSection() {
             <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
               <h3 className="font-semibold">Apply leave</h3>
               <p className="text-xs text-muted-foreground">
-                Click a working day, then the last day of the range. First approved day each month is paid; extra days deduct salary.
+                Click a working day, then the last day of the range. Same-day leave can be full, morning (09:00–13:30), or afternoon (13:30–18:00). Paid quota is 1.0 day per month.
               </p>
               <div className="text-sm">
                 {selectStart ? (
                   <span>
                     {selectStart}
-                    {selectEnd ? ` → ${selectEnd}` : " (click end date)"}
+                    {selectEnd ? ` → ${selectEnd}` : " (click end date or submit a half day)"}
                   </span>
                 ) : (
                   <span className="text-muted-foreground">No dates selected</span>
                 )}
               </div>
+              {singleDay ? (
+                <div className="grid grid-cols-3 gap-2">
+                  {(["full", "morning", "afternoon"] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setHalf(opt)}
+                      className={cn(
+                        "rounded-lg border px-2 py-2 text-xs capitalize",
+                        half === opt ? "border-accent bg-accent/10 text-foreground" : "border-border text-muted-foreground"
+                      )}
+                    >
+                      {opt === "full" ? "Full day" : opt}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <Textarea
                 placeholder="Reason (optional)"
                 value={reason}
@@ -285,6 +321,7 @@ export function CalendarSection() {
                   onClick={() => {
                     setSelectStart(null);
                     setSelectEnd(null);
+                    setHalf("full");
                   }}
                 >
                   Clear
@@ -301,7 +338,7 @@ export function CalendarSection() {
                   <div key={l.id} className="border border-border rounded-xl p-3 space-y-2">
                     <div className="text-sm font-medium">{l.employee_name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {l.start_date} → {l.end_date} · {l.days} day{l.days === 1 ? "" : "s"}
+                      {l.start_date} → {l.end_date} · {leaveSlot(l)}
                     </div>
                     {l.reason ? <div className="text-xs">{l.reason}</div> : null}
                     <div className="flex gap-2">
@@ -351,7 +388,7 @@ export function CalendarSection() {
                       <div>
                         {l.start_date} → {l.end_date}
                       </div>
-                      <div className="text-xs text-muted-foreground capitalize">{l.status} · {l.days} day{l.days === 1 ? "" : "s"}</div>
+                      <div className="text-xs text-muted-foreground capitalize">{l.status} · {leaveSlot(l)}</div>
                     </div>
                     {l.status === "pending" && l.employee_id === user?.id ? (
                       <Button variant="ghost" size="sm" onClick={() => cancelLeave(l)}>

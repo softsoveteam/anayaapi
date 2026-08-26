@@ -29,12 +29,31 @@ type Dashboard = {
     computers_available?: number;
     assignments?: number;
     submitted?: number;
+    sessions_needed?: number;
   };
   pending_eod?: { id: number; unique_id: string; name: string }[];
   unscheduled?: { id: number; unique_id: string; name: string }[];
   trend?: { date: string; clicks: number }[];
   top_performers?: { employee_id: number; name: string; unique_id: string; clicks: number }[];
-  assignments?: { id: number; site_name: string; keyword: string; target_clicks: number | null; click_count: number | null }[];
+  assignments?: {
+    id: number;
+    site_name: string;
+    site_url?: string | null;
+    keyword: string;
+    target_clicks: number | null;
+    click_count: number | null;
+    remaining?: number | null;
+  }[];
+  attendance?: Attendance;
+};
+
+type Attendance = {
+  status: string;
+  label: string;
+  in_at: string | null;
+  last_at: string | null;
+  late: boolean;
+  remaining_seconds?: number;
 };
 
 function changeType(n: number | null | undefined): "positive" | "negative" | "neutral" {
@@ -84,9 +103,9 @@ export function OverviewSection() {
             delay={1}
           />
           <MetricCard
-            title="Assigned sites"
-            value={String(data.metrics.assignments ?? 0)}
-            change={`${session.payload?.today_sessions ?? 0} sessions today`}
+            title="Still needed"
+            value={String(data.metrics.sessions_needed ?? data.assignments?.reduce((s, a) => s + (a.remaining ?? 0), 0) ?? 0)}
+            change="to hit targets"
             changeType="neutral"
             icon={Users}
             delay={2}
@@ -102,7 +121,8 @@ export function OverviewSection() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-3">
+            {data.attendance ? <AttendanceBanner attendance={data.attendance} /> : null}
             <WorkSessionHero
               payload={session.payload}
               remaining={session.remaining}
@@ -111,28 +131,54 @@ export function OverviewSection() {
             />
           </div>
           <div className="bg-card border border-border rounded-2xl p-5">
-            <h3 className="text-base font-semibold mb-1">Today's sites</h3>
+            <h3 className="text-base font-semibold mb-1">Today's work</h3>
             <p className="text-xs text-muted-foreground mb-4">
-              Each finished session adds 1 click to every site.
+              Each finished Work Start adds 1 click to every site + keyword below.
             </p>
             {(data.assignments || []).length === 0 ? (
               <p className="text-sm text-muted-foreground">No work assigned today.</p>
             ) : (
               <div className="space-y-3">
-                {data.assignments?.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-3">
-                    <div>
-                      <div className="text-sm font-medium">{a.site_name}</div>
-                      <div className="text-xs text-muted-foreground">{a.keyword}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-accent tabular-nums">{a.click_count ?? 0}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {a.target_clicks ? `target ${a.target_clicks}` : "auto"}
+                {data.assignments?.map((a) => {
+                  const done = a.click_count ?? 0;
+                  const target = a.target_clicks;
+                  const remaining = a.remaining ?? (target != null ? Math.max(0, target - done) : null);
+                  const pct = target ? Math.min(100, (done / target) * 100) : 0;
+                  return (
+                    <div key={a.id} className="rounded-xl border border-border p-3 space-y-2">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Site</div>
+                        <div className="text-sm font-semibold leading-tight">{a.site_name || "Untitled site"}</div>
                       </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Keyword</div>
+                        <div className="text-sm text-foreground">{a.keyword || "—"}</div>
+                      </div>
+                      <div className="flex items-end justify-between gap-2">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Done / target</div>
+                          <div className="text-sm font-medium tabular-nums">
+                            {done} / {target ?? "no target"}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {remaining != null && remaining > 0 ? (
+                            <div className="text-xs font-medium text-warning">Need {remaining} more</div>
+                          ) : target != null ? (
+                            <div className="text-xs font-medium text-accent">Target met</div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">No target</div>
+                          )}
+                        </div>
+                      </div>
+                      {target ? (
+                        <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                          <div className="h-full bg-accent" style={{ width: `${pct}%` }} />
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -260,6 +306,32 @@ export function OverviewSection() {
             )}
           </div>
         </div>
+    </div>
+  );
+}
+
+function AttendanceBanner({ attendance }: { attendance: Attendance }) {
+  const tone =
+    attendance.status === "on_timer"
+      ? "border-accent/40 bg-accent/10 text-accent"
+      : attendance.status === "idle" || attendance.late
+        ? "border-warning/40 bg-warning/10 text-warning"
+        : attendance.status === "on_leave" || attendance.status === "holiday"
+          ? "border-chart-3/40 bg-chart-3/10"
+          : "border-border bg-card";
+
+  return (
+    <div className={`rounded-2xl border px-4 py-3 flex flex-wrap items-center justify-between gap-2 ${tone}`}>
+      <div>
+        <div className="text-xs uppercase tracking-wide opacity-80">Today</div>
+        <div className="font-semibold">{attendance.label}</div>
+      </div>
+      <div className="text-sm text-muted-foreground">
+        {attendance.in_at
+          ? `In ${new Date(attendance.in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+          : "Not started"}
+        {attendance.late ? " · Late after 9:15" : ""}
+      </div>
     </div>
   );
 }

@@ -79,6 +79,34 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   return data as T;
 }
 
+export async function downloadFile(path: string, filename: string) {
+  const token = getToken();
+  const headers: Record<string, string> = { Accept: "application/pdf" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}${path}`, { headers });
+  if (res.status === 401) {
+    setToken(null);
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(firstError(data, "Download failed"), res.status, data);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const authApi = {
   login: (unique_id: string, password: string) =>
     api<{ token: string; user: User }>("/auth/login", {
@@ -92,7 +120,7 @@ export const authApi = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
-  profile: (payload: { unique_id?: string; name?: string; current_password: string }) =>
+  profile: (payload: { name?: string; current_password: string }) =>
     api<{ message: string; user: User }>("/auth/profile", {
       method: "PUT",
       body: JSON.stringify(payload),
