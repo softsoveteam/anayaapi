@@ -7,6 +7,7 @@ import type { Role } from "@/lib/types";
 import { isStaff } from "@/lib/types";
 import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/lib/auth-context";
+import { useAppSettings } from "@/lib/app-settings";
 import {
   LayoutDashboard,
   Users,
@@ -50,7 +51,12 @@ export function Sidebar({
   onCollapsedChange,
 }: SidebarProps) {
   const { role, user } = useAuth();
-  const navItems = allNav.filter((item) => role && item.roles.includes(role));
+  const { settings } = useAppSettings();
+  const navItems = allNav.filter((item) => {
+    if (!role || !item.roles.includes(role)) return false;
+    if (item.id === "salary" && role === "employee" && !settings?.employee_earnings) return false;
+    return true;
+  });
 
   return (
     <aside

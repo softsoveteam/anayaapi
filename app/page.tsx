@@ -17,6 +17,7 @@ import { SettingsSection } from "@/components/dashboard/sections/settings";
 import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/lib/auth-context";
 import { isStaff } from "@/lib/types";
+import { useAppSettings } from "@/lib/app-settings";
 
 export type Section =
   | "overview"
@@ -32,6 +33,7 @@ export type Section =
 
 export default function Dashboard() {
   const { user, loading, role } = useAuth();
+  const { settings } = useAppSettings();
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<Section>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -44,7 +46,10 @@ export default function Dashboard() {
     if (!isStaff(role) && (activeSection === "employees" || activeSection === "sites" || activeSection === "analytics" || activeSection === "floor")) {
       setActiveSection("overview");
     }
-  }, [role, activeSection]);
+    if (!isStaff(role) && activeSection === "salary" && !settings?.employee_earnings) {
+      setActiveSection("overview");
+    }
+  }, [role, activeSection, settings?.employee_earnings]);
 
   if (loading || !user) {
     return (

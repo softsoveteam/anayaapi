@@ -22,15 +22,18 @@ export function SettingsSection() {
   const [confirm, setConfirm] = useState("");
   const [sessionMinutes, setSessionMinutes] = useState("5");
   const [multipleKeywords, setMultipleKeywords] = useState(false);
+  const [employeeEarnings, setEmployeeEarnings] = useState(false);
   const [savingMinutes, setSavingMinutes] = useState(false);
   const [savingKeywords, setSavingKeywords] = useState(false);
+  const [savingEarnings, setSavingEarnings] = useState(false);
 
   useEffect(() => {
     if (!staff) return;
-    api<{ session_minutes: number; multiple_keywords?: boolean }>("/app-settings")
+    api<{ session_minutes: number; multiple_keywords?: boolean; employee_earnings?: boolean }>("/app-settings")
       .then((res) => {
         setSessionMinutes(String(res.session_minutes));
         setMultipleKeywords(Boolean(res.multiple_keywords));
+        setEmployeeEarnings(Boolean(res.employee_earnings));
       })
       .catch(() => undefined);
   }, [staff]);
@@ -82,6 +85,24 @@ export function SettingsSection() {
       toast.error(errorMessage(err));
     } finally {
       setSavingMinutes(false);
+    }
+  }
+
+  async function onEmployeeEarnings(checked: boolean) {
+    setEmployeeEarnings(checked);
+    setSavingEarnings(true);
+    try {
+      const res = await api<{ message: string; employee_earnings?: boolean }>("/app-settings", {
+        method: "PUT",
+        body: JSON.stringify({ employee_earnings: checked }),
+      });
+      setEmployeeEarnings(Boolean(res.employee_earnings));
+      toast.success(checked ? "Earnings tab is visible to employees" : "Earnings tab is hidden from employees");
+    } catch (err) {
+      setEmployeeEarnings(!checked);
+      toast.error(errorMessage(err));
+    } finally {
+      setSavingEarnings(false);
     }
   }
 
@@ -160,6 +181,26 @@ export function SettingsSection() {
               checked={multipleKeywords}
               disabled={savingKeywords}
               onCheckedChange={onMultipleKeywords}
+              className="data-[state=checked]:bg-accent"
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {staff ? (
+        <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="font-semibold">Employee earnings tab</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                When on, employees see an Earnings page with their salary, leave, overtime, and payslip download.
+                Staff Salary is always available.
+              </p>
+            </div>
+            <Switch
+              checked={employeeEarnings}
+              disabled={savingEarnings}
+              onCheckedChange={onEmployeeEarnings}
               className="data-[state=checked]:bg-accent"
             />
           </div>
