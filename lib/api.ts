@@ -1,6 +1,19 @@
 import { User } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api";
+function resolveApiUrl() {
+  const raw = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+  try {
+    const url = new URL(raw);
+    if (url.hostname === "api-v1-anaya.softsove.life" && !url.pathname.includes("index.php")) {
+      return `${url.origin}/index.php/api`;
+    }
+  } catch {
+    // keep raw
+  }
+  return raw;
+}
+
+const API_URL = resolveApiUrl();
 const TOKEN_KEY = "anaya_token";
 
 export class ApiError extends Error {
