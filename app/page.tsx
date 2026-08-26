@@ -10,6 +10,8 @@ import { ComputersSection } from "@/components/dashboard/sections/computers";
 import { SitesSection } from "@/components/dashboard/sections/sites";
 import { ReportsSection } from "@/components/dashboard/sections/reports";
 import { AnalyticsSection } from "@/components/dashboard/sections/analytics";
+import { CalendarSection } from "@/components/dashboard/sections/calendar";
+import { SalarySection } from "@/components/dashboard/sections/salary";
 import { SettingsSection } from "@/components/dashboard/sections/settings";
 import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/lib/auth-context";
@@ -21,6 +23,8 @@ export type Section =
   | "computers"
   | "sites"
   | "reports"
+  | "calendar"
+  | "salary"
   | "analytics"
   | "settings";
 
@@ -61,6 +65,10 @@ export default function Dashboard() {
         return <SitesSection />;
       case "reports":
         return <ReportsSection />;
+      case "calendar":
+        return <CalendarSection />;
+      case "salary":
+        return <SalarySection />;
       case "analytics":
         return <AnalyticsSection />;
       case "settings":

@@ -20,6 +20,7 @@ export type User = {
   status_label: string;
   interview_date: string | null;
   joining_date: string | null;
+  monthly_salary: number | null;
   notes: string | null;
   role: Role | null;
   roles: Role[];
@@ -126,6 +127,69 @@ export type WorkSessionPayload = {
   today_sessions: number;
   current: WorkSession | null;
   logs: WorkSession[];
+};
+
+export type Holiday = {
+  id: number;
+  date: string;
+  name: string;
+  notes: string | null;
+};
+
+export type LeaveRequest = {
+  id: number;
+  employee_id: number;
+  employee_name?: string | null;
+  unique_id?: string | null;
+  start_date: string;
+  end_date: string;
+  days: number;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected" | string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string | null;
+};
+
+export type OvertimeSession = {
+  id: number;
+  started_at: string;
+  finished_at: string;
+  overtime_seconds: number;
+  overtime_hours: number;
+};
+
+export type PayrollRow = {
+  employee_id: number;
+  name: string;
+  unique_id: string;
+  month: string;
+  calendar_days: number;
+  base: number;
+  day_rate: number;
+  hourly_rate: number;
+  overtime_hourly_rate: number;
+  paid_leave_quota: number;
+  paid_leave_used: number;
+  leave_days: number;
+  unpaid_leave_days: number;
+  leave_dates: string[];
+  leave_deduction: number;
+  overtime_seconds: number;
+  overtime_hours: number;
+  overtime_pay: number;
+  net: number;
+  overtime_sessions?: OvertimeSession[];
+};
+
+export type CalendarPayload = {
+  month: string;
+  work_start: string;
+  work_end: string;
+  paid_leave_quota: number;
+  holidays: Holiday[];
+  leaves: LeaveRequest[];
+  pending?: LeaveRequest[];
 };
 
 export function isStaff(role: Role | null | undefined) {

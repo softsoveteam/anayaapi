@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Settings,
   ClipboardList,
+  CalendarDays,
+  Wallet,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -32,6 +34,9 @@ const allNav: { id: Section; label: string; icon: ElementType; roles: Role[] }[]
   { id: "computers", label: "Computers", icon: Monitor, roles: ["admin", "manager", "employee"] },
   { id: "sites", label: "Sites / Work", icon: Globe, roles: ["admin", "manager"] },
   { id: "reports", label: "Work Report", icon: ClipboardList, roles: ["admin", "manager", "employee"] },
+  { id: "calendar", label: "Calendar", icon: CalendarDays, roles: ["admin", "manager", "employee"] },
+  { id: "salary", label: "Salary", icon: Wallet, roles: ["admin", "manager"] },
+  { id: "salary", label: "Earnings", icon: Wallet, roles: ["employee"] },
   { id: "analytics", label: "Analytics", icon: BarChart3, roles: ["admin", "manager"] },
   { id: "settings", label: "Settings", icon: Settings, roles: ["admin", "manager", "employee"] },
 ];
@@ -67,7 +72,7 @@ export function Sidebar({
 
           return (
             <button
-              key={item.id}
+              key={`${item.id}-${item.label}`}
               onClick={() => onSectionChange(item.id)}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative",

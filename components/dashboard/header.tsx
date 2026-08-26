@@ -5,6 +5,7 @@ import type { Section } from "@/app/page";
 import { Logo } from "@/components/brand/logo";
 import { LogOut } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { isStaff } from "@/lib/types";
 import { useRouter } from "next/navigation";
 
 interface HeaderProps {
@@ -17,12 +18,14 @@ const sectionTitles: Record<Section, string> = {
   computers: "Computers",
   sites: "Sites / Work",
   reports: "Work Report",
+  calendar: "Calendar",
+  salary: "Salary",
   analytics: "Analytics",
   settings: "Settings",
 };
 
 export function Header({ activeSection }: HeaderProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, role } = useAuth();
   const router = useRouter();
   const initials = (user?.name || "A")
     .split(" ")
@@ -36,7 +39,7 @@ export function Header({ activeSection }: HeaderProps) {
       <div className="flex items-center gap-6">
         <Logo variant="mark" className="h-8 w-8 md:hidden" imgClassName="h-8 w-8" />
         <h1 className="text-xl font-semibold text-foreground">
-          {sectionTitles[activeSection]}
+          {activeSection === "salary" && !isStaff(role) ? "Earnings" : sectionTitles[activeSection]}
         </h1>
         <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
           <span>{new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</span>

@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import type { EmployeeStatus, Role, User } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/types";
+import { inr } from "@/lib/money";
 import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ const emptyForm = {
   status: "interview" as EmployeeStatus,
   interview_date: "",
   joining_date: "",
+  monthly_salary: "",
   notes: "",
   password: "",
   role: "employee" as Role,
@@ -86,6 +88,7 @@ export function EmployeesSection() {
       status: user.status,
       interview_date: user.interview_date || "",
       joining_date: user.joining_date || "",
+      monthly_salary: user.monthly_salary != null ? String(user.monthly_salary) : "",
       notes: user.notes || "",
       password: "",
       role: user.role || "employee",
@@ -99,6 +102,7 @@ export function EmployeesSection() {
       const payload: Record<string, unknown> = { ...form };
       if (!payload.password) delete payload.password;
       if (role !== "admin") delete payload.role;
+      payload.monthly_salary = form.monthly_salary === "" ? null : Number(form.monthly_salary);
 
       if (editing) {
         await api(`/employees/${editing.id}`, {
@@ -163,6 +167,7 @@ export function EmployeesSection() {
               <TableHead>Name</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Salary</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Computers</TableHead>
               <TableHead />
@@ -191,6 +196,7 @@ export function EmployeesSection() {
                     </SelectContent>
                   </Select>
                 </TableCell>
+                <TableCell>{e.monthly_salary != null ? inr(e.monthly_salary) : "—"}</TableCell>
                 <TableCell className="capitalize">{e.role}</TableCell>
                 <TableCell>{e.computers?.length ?? 0}</TableCell>
                 <TableCell>
@@ -247,6 +253,16 @@ export function EmployeesSection() {
                 <Input type="date" value={form.joining_date} onChange={(e) => setForm({ ...form, joining_date: e.target.value })} />
               </Field>
             </div>
+            <Field label="Monthly salary (₹)">
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.monthly_salary}
+                onChange={(e) => setForm({ ...form, monthly_salary: e.target.value })}
+                placeholder="30000"
+              />
+            </Field>
             {role === "admin" ? (
               <Field label="Role">
                 <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as Role })}>
