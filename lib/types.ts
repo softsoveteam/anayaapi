@@ -101,6 +101,33 @@ export const STATUS_LABELS: Record<EmployeeStatus, string> = {
   inactive: "Inactive",
 };
 
+export type WorkSessionSite = {
+  site_id: number;
+  site_name: string | null;
+  assignment_id: number;
+};
+
+export type WorkSession = {
+  id: number;
+  status: "running" | "completed" | string;
+  duration_seconds: number;
+  remaining_seconds: number;
+  started_at: string;
+  ends_at: string;
+  finished_at: string | null;
+  site_count: number;
+  clicks_awarded: number;
+  sites: WorkSessionSite[];
+};
+
+export type WorkSessionPayload = {
+  session_minutes: number;
+  today_clicks: number;
+  today_sessions: number;
+  current: WorkSession | null;
+  logs: WorkSession[];
+};
+
 export function isStaff(role: Role | null | undefined) {
   return role === "admin" || role === "manager";
 }

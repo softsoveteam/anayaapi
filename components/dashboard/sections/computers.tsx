@@ -42,6 +42,7 @@ export function ComputersSection() {
   const [assignOpen, setAssignOpen] = useState<Computer | null>(null);
   const [employeeId, setEmployeeId] = useState("");
   const [form, setForm] = useState({ unique_number: "", label: "", notes: "" });
+  const [nextBusy, setNextBusy] = useState(false);
 
   async function load() {
     const path = staff ? "/computers" : "/my/computers";
@@ -57,10 +58,28 @@ export function ComputersSection() {
     load().catch((e) => toast.error(errorMessage(e)));
   }, [staff]);
 
+  async function openCreate() {
+    setForm({ unique_number: "", label: "", notes: "" });
+    setOpen(true);
+    setNextBusy(true);
+    try {
+      const next = await api<{ unique_number: string; label: string }>("/computers/next-number");
+      setForm({ unique_number: next.unique_number, label: next.label, notes: "" });
+    } catch (e) {
+      toast.error(errorMessage(e));
+      setOpen(false);
+    } finally {
+      setNextBusy(false);
+    }
+  }
+
   async function create() {
     try {
-      await api("/computers", { method: "POST", body: JSON.stringify(form) });
-      toast.success("Computer added");
+      const res = await api<{ data: Computer }>("/computers", {
+        method: "POST",
+        body: JSON.stringify({ notes: form.notes || null }),
+      });
+      toast.success(`Computer ${res.data.unique_number} added`);
       setOpen(false);
       setForm({ unique_number: "", label: "", notes: "" });
       await load();
@@ -107,7 +126,7 @@ export function ComputersSection() {
     <div className="space-y-4">
       {staff ? (
         <div className="flex justify-end">
-          <Button onClick={() => setOpen(true)} className="bg-accent text-accent-foreground hover:bg-accent/90">
+          <Button onClick={openCreate} className="bg-accent text-accent-foreground hover:bg-accent/90">
             <Plus className="w-4 h-4" /> Add computer
           </Button>
         </div>
@@ -161,12 +180,13 @@ export function ComputersSection() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Unique number</Label>
-              <Input value={form.unique_number} onChange={(e) => setForm({ ...form, unique_number: e.target.value })} placeholder="PC-1006" />
+              <Label>PC number</Label>
+              <Input value={nextBusy ? "Assigning..." : form.unique_number} readOnly className="font-mono bg-secondary/50" />
+              <p className="text-xs text-muted-foreground">Assigned automatically. Next machine gets the next number.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Label</Label>
-              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Desk C1" />
+              <Input value={nextBusy ? "Assigning..." : form.label} readOnly className="font-mono bg-secondary/50" />
             </div>
             <div className="space-y-1.5">
               <Label>Notes</Label>
@@ -174,7 +194,9 @@ export function ComputersSection() {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={create} className="bg-accent text-accent-foreground hover:bg-accent/90">Save</Button>
+            <Button onClick={create} disabled={nextBusy || !form.unique_number} className="bg-accent text-accent-foreground hover:bg-accent/90">
+              Save
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

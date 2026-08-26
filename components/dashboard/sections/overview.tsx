@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { SessionLogs, WorkSessionHero, useWorkSession } from "@/components/dashboard/work-session-panel";
 import { MousePointerClick, Users, ClipboardList, Monitor } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -46,15 +47,101 @@ export function OverviewSection() {
   const staff = isStaff(role);
   const [data, setData] = useState<Dashboard | null>(null);
 
-  useEffect(() => {
+  const loadDashboard = useCallback(() => {
     api<Dashboard>("/dashboard").then(setData).catch(() => setData(null));
   }, []);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const session = useWorkSession(loadDashboard, !staff);
 
   if (!data) {
     return <div className="text-muted-foreground">Loading dashboard...</div>;
   }
 
   const change = data.metrics.clicks_change ?? 0;
+
+  if (!staff) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            title="Today's clicks"
+            value={String(session.payload?.today_clicks ?? data.metrics.today_clicks)}
+            change="auto counted"
+            changeType="neutral"
+            icon={MousePointerClick}
+            delay={0}
+          />
+          <MetricCard
+            title="Yesterday"
+            value={(data.metrics.yesterday_clicks ?? 0).toLocaleString()}
+            change="clicks"
+            changeType="neutral"
+            icon={ClipboardList}
+            delay={1}
+          />
+          <MetricCard
+            title="Assigned sites"
+            value={String(data.metrics.assignments ?? 0)}
+            change={`${session.payload?.today_sessions ?? 0} sessions today`}
+            changeType="neutral"
+            icon={Users}
+            delay={2}
+          />
+          <MetricCard
+            title="My computers"
+            value={String(data.metrics.computers_assigned ?? 0)}
+            change="assigned"
+            changeType="neutral"
+            icon={Monitor}
+            delay={3}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <WorkSessionHero
+              payload={session.payload}
+              remaining={session.remaining}
+              busy={session.busy}
+              onStart={session.start}
+            />
+          </div>
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <h3 className="text-base font-semibold mb-1">Today's sites</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Each finished session adds 1 click to every site.
+            </p>
+            {(data.assignments || []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No work assigned today.</p>
+            ) : (
+              <div className="space-y-3">
+                {data.assignments?.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-3">
+                    <div>
+                      <div className="text-sm font-medium">{a.site_name}</div>
+                      <div className="text-xs text-muted-foreground">{a.keyword}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-accent tabular-nums">{a.click_count ?? 0}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {a.target_clicks ? `target ${a.target_clicks}` : "auto"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <SessionLogs logs={session.payload?.logs ?? []} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -67,61 +154,30 @@ export function OverviewSection() {
           icon={MousePointerClick}
           delay={0}
         />
-        {staff ? (
-          <>
-            <MetricCard
-              title="Joined employees"
-              value={String(data.metrics.active_employees ?? 0)}
-              change="active"
-              changeType="neutral"
-              icon={Users}
-              delay={1}
-            />
-            <MetricCard
-              title="Pending EOD"
-              value={String(data.metrics.pending_eod ?? 0)}
-              change="not submitted"
-              changeType={(data.metrics.pending_eod ?? 0) > 0 ? "negative" : "positive"}
-              icon={ClipboardList}
-              delay={2}
-            />
-            <MetricCard
-              title="Computers assigned"
-              value={String(data.metrics.computers_assigned ?? 0)}
-              change={`${data.metrics.computers_available ?? 0} free`}
-              changeType="neutral"
-              icon={Monitor}
-              delay={3}
-            />
-          </>
-        ) : (
-          <>
-            <MetricCard
-              title="Yesterday"
-              value={(data.metrics.yesterday_clicks ?? 0).toLocaleString()}
-              change="clicks"
-              changeType="neutral"
-              icon={ClipboardList}
-              delay={1}
-            />
-            <MetricCard
-              title="Today's tasks"
-              value={String(data.metrics.assignments ?? 0)}
-              change={`${data.metrics.submitted ?? 0} reported`}
-              changeType="neutral"
-              icon={Users}
-              delay={2}
-            />
-            <MetricCard
-              title="My computers"
-              value={String(data.metrics.computers_assigned ?? 0)}
-              change="assigned"
-              changeType="neutral"
-              icon={Monitor}
-              delay={3}
-            />
-          </>
-        )}
+        <MetricCard
+          title="Joined employees"
+          value={String(data.metrics.active_employees ?? 0)}
+          change="active"
+          changeType="neutral"
+          icon={Users}
+          delay={1}
+        />
+        <MetricCard
+          title="Pending EOD"
+          value={String(data.metrics.pending_eod ?? 0)}
+          change="not submitted"
+          changeType={(data.metrics.pending_eod ?? 0) > 0 ? "negative" : "positive"}
+          icon={ClipboardList}
+          delay={2}
+        />
+        <MetricCard
+          title="Computers assigned"
+          value={String(data.metrics.computers_assigned ?? 0)}
+          change={`${data.metrics.computers_available ?? 0} free`}
+          changeType="neutral"
+          icon={Monitor}
+          delay={3}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -152,48 +208,27 @@ export function OverviewSection() {
 
         <div className="bg-card border border-border rounded-xl p-5">
           <h3 className="text-base font-semibold mb-4">
-            {staff ? "Top today" : "Today's assignments"}
+            Top today
           </h3>
-          {staff ? (
-            <div className="space-y-3">
-              {(data.top_performers || []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No reports yet today.</p>
-              ) : (
-                data.top_performers?.map((p, i) => (
-                  <div key={p.employee_id} className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">{i + 1}. {p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.unique_id}</div>
-                    </div>
-                    <div className="font-semibold text-accent">{p.clicks.toLocaleString()}</div>
+          <div className="space-y-3">
+            {(data.top_performers || []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No reports yet today.</p>
+            ) : (
+              data.top_performers?.map((p, i) => (
+                <div key={p.employee_id} className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium">{i + 1}. {p.name}</div>
+                    <div className="text-xs text-muted-foreground">{p.unique_id}</div>
                   </div>
-                ))
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {(data.assignments || []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">No work assigned today.</p>
-              ) : (
-                data.assignments?.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-medium">{a.site_name}</div>
-                      <div className="text-xs text-muted-foreground">{a.keyword}</div>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {a.click_count ?? "—"} / {a.target_clicks ?? "—"}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+                  <div className="font-semibold text-accent">{p.clicks.toLocaleString()}</div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {staff ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-card border border-border rounded-xl p-5">
             <h3 className="text-base font-semibold mb-3">Pending EOD</h3>
             {(data.pending_eod || []).length === 0 ? (
@@ -225,7 +260,6 @@ export function OverviewSection() {
             )}
           </div>
         </div>
-      ) : null}
     </div>
   );
 }

@@ -6,9 +6,9 @@ import { api, errorMessage } from "@/lib/api";
 import type { TodayTask, User } from "@/lib/types";
 import { isStaff } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SessionLogs, useWorkSession } from "@/components/dashboard/work-session-panel";
 import {
   Table,
   TableBody,
@@ -56,94 +56,69 @@ export function ReportsSection() {
 
 function EmployeeReport() {
   const [payload, setPayload] = useState<TodayPayload | null>(null);
-  const [counts, setCounts] = useState<Record<number, string>>({});
-  const [saving, setSaving] = useState(false);
+  const session = useWorkSession(() => {
+    load().catch(() => undefined);
+  });
 
   async function load() {
     const res = await api<TodayPayload>("/my/today");
     setPayload(res);
-    const next: Record<number, string> = {};
-    res.data.forEach((row) => {
-      next[row.assignment_id] = row.click_count != null ? String(row.click_count) : "";
-    });
-    setCounts(next);
   }
 
   useEffect(() => {
     load().catch((e) => toast.error(errorMessage(e)));
   }, []);
 
-  async function submit() {
-    if (!payload) return;
-    setSaving(true);
-    try {
-      await api("/my/reports", {
-        method: "POST",
-        body: JSON.stringify({
-          date: payload.date,
-          items: payload.data.map((row) => ({
-            assignment_id: row.assignment_id,
-            click_count: Number(counts[row.assignment_id] || 0),
-          })),
-        }),
-      });
-      toast.success("Report submitted");
-      await load();
-    } catch (e) {
-      toast.error(errorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   if (!payload) return <div className="text-muted-foreground">Loading today's work...</div>;
 
   if (payload.data.length === 0) {
     return (
-      <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
-        No sites assigned today. If your manager did not schedule you, yesterday's work is copied overnight.
+      <div className="space-y-6">
+        <div className="bg-card border border-border rounded-xl p-8 text-center text-muted-foreground">
+          No sites assigned today. If your manager did not schedule you, yesterday's work is copied overnight.
+        </div>
+        <SessionLogs logs={session.payload?.logs ?? []} />
       </div>
     );
   }
 
+  const uniqueSites = Array.from(
+    new Map(payload.data.map((row) => [row.site_id, row])).values()
+  );
+
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Enter clicks for each assigned site, then submit at end of day. You can update today's numbers until midnight.
+        Clicks are counted from the Work Start timer on Overview. You cannot add numbers by hand.
       </p>
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-        {payload.data.map((row) => (
-          <div key={row.assignment_id} className="grid grid-cols-[1fr_140px] gap-4 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="text-sm text-muted-foreground">Today's clicks</div>
+          <div className="text-3xl font-bold mt-1 text-accent">{payload.total_clicks.toLocaleString()}</div>
+        </div>
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="text-sm text-muted-foreground">Sessions today</div>
+          <div className="text-3xl font-bold mt-1">{session.payload?.today_sessions ?? 0}</div>
+        </div>
+      </div>
+      <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+        <h3 className="font-semibold">Per site</h3>
+        {uniqueSites.map((row) => (
+          <div key={row.assignment_id} className="flex items-center justify-between gap-4 py-2 border-b border-border last:border-0">
             <div>
               <div className="font-medium">{row.site_name}</div>
               <div className="text-xs text-muted-foreground">{row.keyword}</div>
-              {row.target_clicks ? (
-                <div className="text-xs text-muted-foreground mt-1">Target {row.target_clicks}</div>
-              ) : null}
             </div>
-            <div className="space-y-1.5">
-              <Label>Clicks</Label>
-              <Input
-                type="number"
-                min={0}
-                value={counts[row.assignment_id] ?? ""}
-                onChange={(e) => setCounts({ ...counts, [row.assignment_id]: e.target.value })}
-              />
+            <div className="text-right">
+              <div className="text-lg font-bold tabular-nums">{row.click_count ?? 0}</div>
+              {row.target_clicks ? (
+                <div className="text-xs text-muted-foreground">target {row.target_clicks}</div>
+              ) : null}
             </div>
           </div>
         ))}
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-sm text-muted-foreground">
-            Total{" "}
-            <span className="text-foreground font-semibold">
-              {payload.data.reduce((sum, row) => sum + Number(counts[row.assignment_id] || 0), 0)}
-            </span>
-          </div>
-          <Button onClick={submit} disabled={saving} className="bg-accent text-accent-foreground hover:bg-accent/90">
-            {saving ? "Saving..." : payload.submitted ? "Update report" : "Submit EOD"}
-          </Button>
-        </div>
       </div>
+      <SessionLogs logs={session.payload?.logs ?? []} />
     </div>
   );
 }
