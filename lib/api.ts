@@ -79,4 +79,9 @@ export const authApi = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+  profile: (payload: { unique_id?: string; name?: string; current_password: string }) =>
+    api<{ message: string; user: User }>("/auth/profile", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
 };

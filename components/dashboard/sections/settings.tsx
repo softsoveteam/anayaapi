@@ -11,12 +11,31 @@ import { StatusBadge } from "@/components/dashboard/status-badge";
 import { Logo } from "@/components/brand/logo";
 
 export function SettingsSection() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
+  const [uniqueId, setUniqueId] = useState(user?.unique_id ?? "");
+  const [name, setName] = useState(user?.name ?? "");
+  const [profilePassword, setProfilePassword] = useState("");
   const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 
-  async function onSubmit(e: FormEvent) {
+  async function onProfile(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await authApi.profile({
+        unique_id: uniqueId.trim(),
+        name: name.trim(),
+        current_password: profilePassword,
+      });
+      toast.success("ID and name updated");
+      setProfilePassword("");
+      await refresh();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  }
+
+  async function onPassword(e: FormEvent) {
     e.preventDefault();
     try {
       await authApi.password({
@@ -43,47 +62,53 @@ export function SettingsSection() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-      <div className="bg-card border border-border rounded-xl p-5 space-y-3">
-        <h3 className="font-semibold">Profile</h3>
-        <Row label="Unique ID" value={user.unique_id} />
-        <Row label="Name" value={user.name} />
-        <Row label="Role" value={user.role || "—"} />
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Status</span>
-          <StatusBadge status={user.status} />
-        </div>
-        <Row label="Phone" value={user.phone || "—"} />
-        <Row label="Email" value={user.email || "—"} />
-      </div>
+        <form onSubmit={onProfile} className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <h3 className="font-semibold">Account</h3>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Role</span>
+            <span className="font-medium capitalize">{user.role || "—"}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Status</span>
+            <StatusBadge status={user.status} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Unique ID</Label>
+            <Input value={uniqueId} onChange={(e) => setUniqueId(e.target.value)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Current password</Label>
+            <Input
+              type="password"
+              value={profilePassword}
+              onChange={(e) => setProfilePassword(e.target.value)}
+              required
+            />
+          </div>
+          <Button type="submit">Update ID</Button>
+        </form>
 
-      <form onSubmit={onSubmit} className="bg-card border border-border rounded-xl p-5 space-y-3">
-        <h3 className="font-semibold">Change password</h3>
-        <div className="space-y-1.5">
-          <Label>Current password</Label>
-          <Input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
-        </div>
-        <div className="space-y-1.5">
-          <Label>New password</Label>
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Confirm</Label>
-          <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
-        </div>
-        <Button type="submit" className="bg-accent text-accent-foreground hover:bg-accent/90">
-          Update password
-        </Button>
-      </form>
+        <form onSubmit={onPassword} className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <h3 className="font-semibold">Change password</h3>
+          <div className="space-y-1.5">
+            <Label>Current password</Label>
+            <Input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+          </div>
+          <div className="space-y-1.5">
+            <Label>New password</Label>
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Confirm</Label>
+            <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+          </div>
+          <Button type="submit">Update password</Button>
+        </form>
       </div>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium capitalize">{value}</span>
     </div>
   );
 }
