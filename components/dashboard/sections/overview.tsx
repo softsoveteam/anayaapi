@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { SessionLogs, WorkSessionHero, useWorkSession } from "@/components/dashboard/work-session-panel";
+import { WorkSiteCard } from "@/components/dashboard/site-mark";
 import { MousePointerClick, Users, ClipboardList, Monitor, Timer } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -42,6 +43,8 @@ type Dashboard = {
     id: number;
     site_name: string;
     site_url?: string | null;
+    site_domain?: string | null;
+    site_favicon?: string | null;
     keyword: string;
     click_count: number | null;
   }[];
@@ -158,35 +161,28 @@ export function OverviewSection() {
             <h3 className="text-base font-semibold mb-1">Today's work</h3>
             <p className="text-xs text-muted-foreground mb-4">
               {employeePace?.multiple_keywords
-                ? `Open every keyword in its own tab on every computer. A finished ${employeePace.session_minutes}-min session adds ${employeePace.computers} click${employeePace.computers === 1 ? "" : "s"} to each keyword.`
-                : `Open one tab per site on every computer. A finished ${employeePace?.session_minutes ?? 5}-min session adds ${employeePace?.computers ?? 0} click${employeePace?.computers === 1 ? "" : "s"} to each site.`}
+                ? `Open the domain, then search the keyword in its own tab on every computer. Each finished ${employeePace.session_minutes}-min session adds ${employeePace.computers} click${employeePace.computers === 1 ? "" : "s"} per keyword.`
+                : `Open the domain on every computer (one tab per site). Each finished ${employeePace?.session_minutes ?? 5}-min session adds ${employeePace?.computers ?? 0} click${employeePace?.computers === 1 ? "" : "s"} per site.`}
             </p>
             {(data.assignments || []).length === 0 ? (
               <p className="text-sm text-muted-foreground">No work assigned today.</p>
             ) : (
               <div className="space-y-3">
                 {data.assignments?.map((a) => (
-                  <div key={a.id} className="rounded-xl border border-border p-3 space-y-2">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Site</div>
-                      <div className="text-sm font-semibold leading-tight">{a.site_name || "Untitled site"}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Keyword</div>
-                      <div className="text-sm text-foreground">{a.keyword || "—"}</div>
-                    </div>
-                    <div className="flex items-end justify-between gap-2">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Clicks today</div>
-                        <div className="text-sm font-medium tabular-nums">{a.click_count ?? 0}</div>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {employeePace?.multiple_keywords
-                          ? `+${employeePace.computers} / session`
-                          : "counted per site"}
-                      </div>
-                    </div>
-                  </div>
+                  <WorkSiteCard
+                    key={a.id}
+                    siteName={a.site_name}
+                    siteUrl={a.site_url}
+                    siteDomain={a.site_domain}
+                    siteFavicon={a.site_favicon}
+                    keyword={a.keyword}
+                    clicks={a.click_count}
+                    hint={
+                      employeePace?.multiple_keywords
+                        ? `+${employeePace.computers} / session`
+                        : "counted per site"
+                    }
+                  />
                 ))}
               </div>
             )}

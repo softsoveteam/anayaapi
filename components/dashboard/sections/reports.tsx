@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SessionLogs, useWorkSession } from "@/components/dashboard/work-session-panel";
+import { WorkSiteCard } from "@/components/dashboard/site-mark";
 import {
   Table,
   TableBody,
@@ -99,27 +100,20 @@ function EmployeeReport() {
       </div>
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
         <h3 className="font-semibold">Today's sites and keywords</h3>
-        {payload.data.map((row) => {
-          const done = row.click_count ?? 0;
-          return (
-            <div key={row.assignment_id} className="rounded-xl border border-border p-4 space-y-2">
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Site</div>
-                  <div className="font-semibold">{row.site_name || "Untitled site"}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Keyword</div>
-                  <div className="font-medium">{row.keyword || "—"}</div>
-                </div>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Clicks today</span>
-                <span className="tabular-nums font-medium">{done}</span>
-              </div>
-            </div>
-          );
-        })}
+        <p className="text-xs text-muted-foreground -mt-2">
+          Open the domain, then search the keyword. Use the same tabs on every assigned computer.
+        </p>
+        {payload.data.map((row) => (
+          <WorkSiteCard
+            key={row.assignment_id}
+            siteName={row.site_name}
+            siteUrl={row.site_url}
+            siteDomain={row.site_domain}
+            siteFavicon={row.site_favicon}
+            keyword={row.keyword}
+            clicks={row.click_count}
+          />
+        ))}
       </div>
       <SessionLogs logs={session.payload?.logs ?? []} />
     </div>

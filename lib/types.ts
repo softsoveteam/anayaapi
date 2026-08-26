@@ -62,6 +62,8 @@ export type Site = {
   id: number;
   name: string;
   url: string;
+  domain?: string | null;
+  favicon_url?: string | null;
   status: string;
   notes: string | null;
   keywords: Keyword[];
@@ -72,7 +74,7 @@ export type Assignment = {
   employee_id: number;
   employee: { id: number; name: string; unique_id: string };
   site_id: number;
-  site: { id: number; name: string; url: string };
+  site: { id: number; name: string; url: string; domain?: string | null; favicon_url?: string | null };
   keyword_id: number;
   keyword: string;
   work_date: string;
@@ -87,6 +89,8 @@ export type TodayTask = {
   site_id: number;
   site_name: string;
   site_url: string;
+  site_domain?: string | null;
+  site_favicon?: string | null;
   keyword_id: number;
   keyword: string;
   target_clicks?: number | null;

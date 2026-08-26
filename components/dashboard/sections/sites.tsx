@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import type { Assignment, Site, User } from "@/lib/types";
+import { SiteMark, siteDomain } from "@/components/dashboard/site-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -228,9 +229,15 @@ export function SitesSection() {
           {sites.map((site) => (
             <div key={site.id} className="bg-card border border-border rounded-xl p-5">
               <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h3 className="font-semibold">{site.name}</h3>
-                  <p className="text-xs text-muted-foreground break-all">{site.url}</p>
+                <div className="flex items-start gap-3 min-w-0">
+                  <SiteMark domain={site.domain || siteDomain(site.url)} favicon={site.favicon_url} name={site.name} />
+                  <div className="min-w-0">
+                    <h3 className="font-semibold leading-tight">{site.domain || siteDomain(site.url) || site.name}</h3>
+                    {site.name && site.name.toLowerCase() !== (site.domain || siteDomain(site.url) || "").toLowerCase() ? (
+                      <p className="text-xs text-muted-foreground truncate">{site.name}</p>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground break-all">{site.url}</p>
+                  </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => { setKeyword(""); setKwOpen(site); }}>
                   + Keyword
@@ -262,7 +269,7 @@ export function SitesSection() {
             </div>
             <div className="space-y-1.5">
               <Label>URL</Label>
-              <Input value={siteForm.url} onChange={(e) => setSiteForm({ ...siteForm, url: e.target.value })} placeholder="https://" />
+              <Input value={siteForm.url} onChange={(e) => setSiteForm({ ...siteForm, url: e.target.value })} placeholder="https://soundbuttons.com" />
             </div>
           </div>
           <DialogFooter>
